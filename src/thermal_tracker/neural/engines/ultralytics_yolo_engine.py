@@ -1,0 +1,133 @@
+"""Обёртка над Ultralytics YOLO в режиме track().
+
+Используем её как первый рабочий neural backend:
+- модель берёт кадр;
+- внешний tracker (ByteTrack/BoT-SORT) раздаёт track id;
+- на выходе получаем нормальный список `DetectedObject`.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+from ultralytics import YOLO
+
+from ...config import NeuralConfig, PROJECT_ROOT
+from ...domain.models import BoundingBox, DetectedObject
+from .base_inference_engine import BaseInferenceEngine
+
+
+def _resolve_path(raw_path: str) -> str:
+    """Приводит относительный путь к абсолютному относительно корня проекта."""
+
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_absolute():
+        return str(candidate)
+    return str((PROJECT_ROOT / candidate).resolve())
+
+
+class UltralyticsYoloEngine(BaseInferenceEngine):
+    """Нейросетевой backend на базе `ultralytics.YOLO`."""
+
+    engine_name = "ultralytics_yolo"
+    is_ready = True
+
+    def __init__(self, config: NeuralConfig) -> None:
+        if not config.model_path.strip():
+            raise RuntimeError("Для neural pipeline не задан путь к файлу модели.")
+
+        self.config = config
+        self.model_path = _resolve_path(config.model_path)
+        self.tracker_config_path = _resolve_path(config.tracker_config_path) if config.tracker_config_path.strip() else ""
+        self.model = YOLO(self.model_path)
+        self._track_mode_enabled = self._check_track_mode_available()
+        self.mode_name = "track" if self._track_mode_enabled else "predict"
+
+    def track(self, frame: np.ndarray) -> list[DetectedObject]:
+        """Запускает `model.track()` и возвращает детекции в наших структурах."""
+
+        results = self._run_model(frame)
+        if not results:
+            return []
+
+        result = results[0]
+        boxes = result.boxes
+        if boxes is None or boxes.xyxy is None:
+            return []
+
+        xyxy = boxes.xyxy.cpu().numpy()
+        confs = boxes.conf.cpu().numpy() if boxes.conf is not None else np.zeros((xyxy.shape[0],), dtype=float)
+        class_ids = boxes.cls.cpu().numpy().astype(int) if boxes.cls is not None else np.full((xyxy.shape[0],), -1, dtype=int)
+        track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else np.full((xyxy.shape[0],), -1, dtype=int)
+        names = result.names or {}
+
+        detections: list[DetectedObject] = []
+        for index, box in enumerate(xyxy):
+            x1, y1, x2, y2 = [int(round(value)) for value in box.tolist()]
+            bbox = BoundingBox(
+                x=min(x1, x2),
+                y=min(y1, y2),
+                width=max(1, abs(x2 - x1)),
+                height=max(1, abs(y2 - y1)),
+            ).clamp(frame.shape)
+            class_id = int(class_ids[index]) if index < len(class_ids) else -1
+            track_id = (
+                int(track_ids[index])
+                if self._track_mode_enabled and index < len(track_ids) and track_ids[index] >= 0
+                else None
+            )
+            label = str(names.get(class_id, f"class_{class_id}"))
+            detections.append(
+                DetectedObject(
+                    bbox=bbox,
+                    area=bbox.area,
+                    confidence=float(confs[index]) if index < len(confs) else 0.0,
+                    label=label,
+                    source=f"{self.engine_name}_{self.mode_name}",
+                    track_id=track_id,
+                    class_id=class_id if class_id >= 0 else None,
+                )
+            )
+
+        return detections
+
+    def _check_track_mode_available(self) -> bool:
+        """Проверяет, можем ли реально использовать внешний tracker.
+
+        Ultralytics для ByteTrack/BotSort требует пакет `lap`. Если его нет,
+        честно откатываемся на `predict()` и не устраиваем каждый запуск
+        мини-спектакль с бесполезной попыткой auto-install.
+        """
+
+        if not self.tracker_config_path:
+            return False
+        try:
+            import lap  # noqa: F401
+        except Exception:
+            return False
+        return True
+
+    def _build_common_kwargs(self) -> dict[str, object]:
+        """Собирает общие аргументы для `predict()` и `track()`."""
+
+        kwargs: dict[str, object] = {
+            "verbose": False,
+            "conf": self.config.confidence_threshold,
+            "iou": self.config.iou_threshold,
+        }
+        if self.config.device.strip():
+            kwargs["device"] = self.config.device.strip()
+        if self.config.allowed_classes:
+            kwargs["classes"] = list(self.config.allowed_classes)
+        return kwargs
+
+    def _run_model(self, frame: np.ndarray):
+        """Запускает модель в режиме `track()` или безопасно откатывается к `predict()`."""
+
+        kwargs = self._build_common_kwargs()
+        if self._track_mode_enabled:
+            kwargs["persist"] = True
+            kwargs["tracker"] = self.tracker_config_path
+            return self.model.track(frame, **kwargs)
+        return self.model.predict(frame, **kwargs)

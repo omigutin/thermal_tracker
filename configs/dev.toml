@@ -1,0 +1,30 @@
+[app]
+mode = "dev"
+scenario = "nn_manual"
+
+[connections.frames]
+reader = "opencv_video"
+source_path = "video"
+
+[connections.commands]
+reader = "gui"
+
+[connections.results]
+writer = "gui"
+
+[gui]
+enabled = true
+show_technical_info = true
+record_output = false
+output_dir = "out"
+
+[model]
+type = "yolo"
+model_path = "models/model.pt"
+
+[tracker]
+config_path = "trackers/botsort.yaml"
+
+[history]
+enabled = false
+store = "null"

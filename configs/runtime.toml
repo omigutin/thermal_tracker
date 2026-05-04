@@ -1,0 +1,27 @@
+[app]
+mode = "runtime"
+scenario = "nn_manual"
+
+[connections.frames]
+reader = "shared_memory"
+camera_count = 4
+
+[connections.commands]
+reader = "shared_memory"
+
+[connections.results]
+writer = "shared_memory"
+
+[gui]
+enabled = false
+
+[model]
+type = "yolo"
+model_path = "models/model.pt"
+
+[tracker]
+config_path = "trackers/botsort.yaml"
+
+[history]
+enabled = false
+store = "null"
