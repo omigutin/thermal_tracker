@@ -1,4 +1,4 @@
-"""Result writer implementations."""
+"""Реализации писателей результатов."""
 
 from .base_result_writer import BaseResultWriter
 from .file_result_writer import FileResultWriter

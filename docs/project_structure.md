@@ -10,6 +10,7 @@ src/
       frames/
       commands/
       results/
+    nnet_interface/
     gui/
     storage/
     config/
@@ -21,6 +22,7 @@ run_runtime.py
 models/
 trackers/
 presets/
+configs/
 video/
 docs/
 out/
@@ -43,4 +45,4 @@ out/
 - `connections/commands` reads operator/runtime commands from GUI, Shared Memory, or null readers.
 - `connections/results` writes results to GUI, Shared Memory, files, or logs.
 
-Launch configs live in `presets/dev.toml` and `presets/runtime.toml`. Algorithm presets stay in the same `presets/` directory for now to avoid extra root-level config sprawl.
+Launch configs live in `configs/dev.toml` and `configs/runtime.toml`. Algorithm presets stay in `presets/`.

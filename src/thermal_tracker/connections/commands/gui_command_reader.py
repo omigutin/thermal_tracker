@@ -1,4 +1,4 @@
-"""GUI command reader placeholder."""
+"""Заготовка читателя команд из GUI."""
 
 from __future__ import annotations
 

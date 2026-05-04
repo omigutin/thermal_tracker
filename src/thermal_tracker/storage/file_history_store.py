@@ -1,4 +1,4 @@
-"""File history store placeholder."""
+"""Заготовка файлового хранилища истории."""
 
 from __future__ import annotations
 

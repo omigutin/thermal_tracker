@@ -1,7 +1,7 @@
-"""Single-target tracker на базе YOLO.track() и внешнего multi-object tracker.
+"""Трекер одной цели на базе YOLO.track() и внешнего многообъектного трекера.
 
 Логика простая:
-- каждый кадр прогоняем через нейросетевой detector + ByteTrack;
+- каждый кадр прогоняем через NN-детектор + ByteTrack;
 - пользователь кликом выбирает одну из найденных целей;
 - дальше держимся за её track id;
 - если id потерялся, пытаемся вернуть цель по классу, близости и размеру бокса.
@@ -13,7 +13,7 @@ import math
 
 from ...config import ClickSelectionConfig, NeuralConfig, TrackerConfig
 from ...domain.models import BoundingBox, DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
-from ...neural.engines import UltralyticsYoloEngine
+from ...nnet_interface import YoloNnetInterface
 from .base_target_tracker import BaseSingleTargetTracker
 
 
@@ -23,7 +23,7 @@ def _point_inside_bbox(point: tuple[int, int], bbox: BoundingBox) -> bool:
 
 
 class YoloTrackSingleTargetTracker(BaseSingleTargetTracker):
-    """Ведёт одну выбранную цель поверх общего neural tracking-потока."""
+    """Ведёт одну выбранную цель поверх общего NN-потока сопровождения."""
 
     implementation_name = "yolo_track_single_target"
     is_ready = True
@@ -37,7 +37,7 @@ class YoloTrackSingleTargetTracker(BaseSingleTargetTracker):
         self.config = tracker_config
         self.click_config = click_config
         self.neural_config = neural_config
-        self.engine = UltralyticsYoloEngine(neural_config)
+        self.engine = YoloNnetInterface(neural_config)
 
         self._manual_track_id: int | None = None
         self._next_manual_track_id = 0

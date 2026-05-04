@@ -1,4 +1,4 @@
-"""GUI result writer placeholder."""
+"""Заготовка писателя результатов в GUI."""
 
 from __future__ import annotations
 

@@ -18,9 +18,9 @@ The GUI is a dev workstation, not the center of the architecture. Frames, operat
 
 ## Dev vs Runtime
 
-Dev launch uses `presets/dev.toml`, `run_dev.py`, and the GUI. It is meant for research, visual inspection, manual target selection, and technical overlays.
+Dev launch uses `configs/dev.toml`, `run_dev.py`, and the GUI. It is meant for research, visual inspection, manual target selection, and technical overlays.
 
-Runtime launch uses `presets/runtime.toml`, `run_runtime.py`, and headless connections. Shared Memory belongs under:
+Runtime launch uses `configs/runtime.toml`, `run_runtime.py`, and headless connections. Shared Memory belongs under:
 
 - `thermal_tracker/connections/frames/shared_memory_frame_reader.py`
 - `thermal_tracker/connections/commands/shared_memory_command_reader.py`

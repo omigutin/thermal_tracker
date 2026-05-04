@@ -3,7 +3,7 @@
 
 [meta]
 id = "yolo_auto"
-title = "Neural YOLO Auto"
+title = "YOLO Auto"
 tooltip = "Автоматический режим: нейросеть сама ищет все объекты."
 description = """
 Подходит для сценария, где не нужно кликать по цели.

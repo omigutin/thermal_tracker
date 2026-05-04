@@ -1,4 +1,4 @@
-"""Common scenario protocol."""
+"""Общий протокол сценария."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Protocol
 class BaseScenario(Protocol):
     @property
     def preset_name(self) -> str:
-        """Short preset name used by the scenario."""
+        """Короткое имя пресета, используемого сценарием."""
 
     def process_next_raw_frame(self, *args, **kwargs):
-        """Process one raw frame."""
+        """Обрабатывает один сырой кадр."""

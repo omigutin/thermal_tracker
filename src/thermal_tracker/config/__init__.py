@@ -1,4 +1,4 @@
-"""Public configuration API for thermal_tracker."""
+"""Публичный API конфигурации `thermal_tracker`."""
 
 from .app_config import (
     AppConfig,

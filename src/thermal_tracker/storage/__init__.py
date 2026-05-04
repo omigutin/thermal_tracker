@@ -1,4 +1,4 @@
-"""History storage implementations."""
+"""Реализации хранилищ истории."""
 
 from .base_history_store import BaseHistoryStore
 from .file_history_store import FileHistoryStore

@@ -1,4 +1,4 @@
-"""Автоматический neural pipeline без ручного клика.
+"""Автоматический NN-сценарий без ручного клика.
 
 Сценарий простой:
 1. берём кадр;
@@ -18,7 +18,7 @@ import numpy as np
 from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
-from ..neural.engines import UltralyticsYoloEngine
+from ..nnet_interface import YoloNnetInterface
 from ..processing_stages.frame_preprocessing import IdentityFramePreprocessor
 from ..processing_stages.frame_stabilization import NoMotionEstimator, PhaseCorrelationMotionEstimator
 
@@ -37,7 +37,7 @@ class AutoNeuralDetectionPipeline:
             if self.preset.global_motion.enabled
             else NoMotionEstimator()
         )
-        self.engine = UltralyticsYoloEngine(self.preset.neural)
+        self.engine = YoloNnetInterface(self.preset.neural)
 
         self.current_frame: ProcessedFrame | None = None
         self.current_snapshot: TrackSnapshot = self._build_snapshot(GlobalMotion(), (), "Нейросеть ещё не запускалась.")
@@ -60,7 +60,7 @@ class AutoNeuralDetectionPipeline:
         raw_frame: np.ndarray,
         runtime: SessionRuntimeState,
     ) -> ScenarioStepResult:
-        """Прогоняет новый кадр через полностью автоматический neural-контур."""
+        """Прогоняет новый кадр через полностью автоматический NN-контур."""
 
         self.current_frame = self.preprocessor.process(raw_frame)
         motion = self.motion_estimator.estimate(self.current_frame)

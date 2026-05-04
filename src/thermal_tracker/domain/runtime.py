@@ -1,4 +1,4 @@
-"""Runtime state and scenario step results."""
+"""Состояние выполнения и результаты шага сценария."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from .models import DetectedObject, GlobalMotion, MotionDetectionResult, Process
 
 @dataclass
 class SessionRuntimeState:
-    """Mutable user/session commands consumed while frames are processed."""
+    """Изменяемые команды пользователя или сессии, потребляемые при обработке кадров."""
 
     pending_click: tuple[int, int] | None = None
     reset_requested: bool = False
@@ -19,7 +19,7 @@ class SessionRuntimeState:
 
 @dataclass
 class ScenarioStepResult:
-    """Result returned by an interactive scenario after one frame."""
+    """Результат интерактивного сценария после обработки одного кадра."""
 
     frame: ProcessedFrame
     snapshot: TrackSnapshot
@@ -27,7 +27,7 @@ class ScenarioStepResult:
 
 @dataclass
 class AutoScenarioStepResult:
-    """Result returned by an automatic scenario after one frame."""
+    """Результат автоматического сценария после обработки одного кадра."""
 
     frame: ProcessedFrame
     global_motion: GlobalMotion

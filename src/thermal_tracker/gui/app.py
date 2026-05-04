@@ -1,4 +1,4 @@
-"""GUI entry point for the dev workstation."""
+"""Точка входа GUI для dev-режима."""
 
 from __future__ import annotations
 
@@ -18,13 +18,13 @@ def _default_video_from_config(source_path: str) -> str:
 
 def run_gui(
     *,
-    config_path: str = "presets/dev.toml",
+    config_path: str = "configs/dev.toml",
     default_video: str = "",
     default_preset: str = "",
     default_delay_ms: int = 30,
     auto_start: bool = False,
 ) -> None:
-    """Open the interactive dev GUI using the run preset as defaults."""
+    """Открывает интерактивный GUI с настройками из run-конфига."""
 
     app_config = load_app_config(config_path)
     preset_name = default_preset or default_preset_for_scenario(app_config.app.scenario)
@@ -45,7 +45,7 @@ main = run_gui
 
 
 def build_argument_parser():
-    """Return the CLI parser from cli.py for compatibility."""
+    """Возвращает CLI-парсер из `cli.py` для совместимости."""
 
     from ..cli import build_argument_parser as _build_argument_parser
 

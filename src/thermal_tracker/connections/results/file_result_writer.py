@@ -1,4 +1,4 @@
-"""File result writer placeholder."""
+"""Заготовка файлового писателя результатов."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""History store contract."""
+"""Контракт хранилища истории."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ class BaseHistoryStore(ABC):
 
     @abstractmethod
     def append(self, item: Any) -> None:
-        """Store one history item."""
+        """Сохраняет одну запись истории."""
 
     def close(self) -> None:
         pass

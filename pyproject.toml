@@ -1,0 +1,52 @@
+[project]
+name = "thermal-tracker"
+version = "0.1.0"
+description = "Thermal video target tracking and motion detection toolkit."
+authors = [
+    { name = "omigutin", email = "migutin83@yandex.ru" }
+]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12,<3.13"
+keywords = [
+    "thermal-imaging",
+    "tracking",
+    "opencv",
+    "yolo",
+]
+dynamic = ["dependencies"]
+
+
+[tool.poetry]
+packages = [
+    { include = "thermal_tracker", from = "src" },
+]
+
+[tool.poetry.dependencies]
+# --- base / prod ---
+numpy = "==2.4.2"
+opencv-python = "==4.13.0.92"
+ultralytics = "==8.4.43"
+
+
+# =========================
+# Local development / tools
+# =========================
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8,<10"
+
+
+[tool.pytest.ini_options]
+norecursedirs = [
+    ".git",
+    ".idea",
+    ".venv",
+    ".pytest_cache",
+    "__pycache__",
+    "out",
+    "video",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

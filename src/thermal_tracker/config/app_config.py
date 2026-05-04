@@ -1,4 +1,4 @@
-"""Runtime/dev application config loaded from TOML presets."""
+"""Конфиги запуска dev/runtime, загружаемые из TOML-файлов."""
 
 from __future__ import annotations
 

@@ -1,2 +1,1 @@
-"""External connections for frames, commands, and results."""
-
+"""Внешние подключения для кадров, команд и результатов."""

@@ -12,12 +12,14 @@
 
 from __future__ import annotations
 
+import json
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import cv2
+import numpy as np
 
 from ..config import AVAILABLE_PRESETS, PROJECT_ROOT, build_preset, get_preset_presentation
 from ..errors import VideoOpenError
@@ -35,6 +37,7 @@ VIDEO_DIALOG_TYPES = [
     ("Видеофайлы", "*.mp4 *.avi *.mov *.mkv *.mpeg *.mpg *.wmv *.m4v"),
     ("Все файлы", "*.*"),
 ]
+SHORTCUT_BINDTAG = "ThermalTrackerShortcuts"
 
 
 class TrackingPlayerWindow:
@@ -61,6 +64,9 @@ class TrackingPlayerWindow:
         self._preview_video_path: Path | None = None
         self._preview_frame = None
         self._record_output_path: Path | None = None
+        self._record_log_path: Path | None = None
+        self._record_log_file = None
+        self._record_frame_size: tuple[int, int] | None = None
         self._video_writer: cv2.VideoWriter | None = None
         self._last_written_render_revision = -1
         self._display_box = (0, 0, 1, 1, 1, 1)
@@ -472,22 +478,13 @@ class TrackingPlayerWindow:
 
         info_footer_frame = ttk.Frame(right_frame, padding=(0, 8, 0, 0))
         info_footer_frame.grid(row=1, column=1, sticky="ew")
-        info_footer_frame.columnconfigure(2, weight=1)
-
-        ttk.Label(info_footer_frame, text="Скорость:").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ttk.Entry(
-            info_footer_frame,
-            textvariable=self._speed_factor_var,
-            width=8,
-            justify="center",
-        ).grid(row=0, column=1, sticky="w")
-        ttk.Label(info_footer_frame, text="x").grid(row=0, column=2, sticky="w", padx=(4, 0))
+        info_footer_frame.columnconfigure(0, weight=1)
         ttk.Checkbutton(
             info_footer_frame,
-            text="Записывать видео в out/",
+            text="Записать видео",
             variable=self._record_video_var,
             command=self._toggle_recording,
-        ).grid(row=0, column=3, sticky="e", padx=(12, 0))
+        ).grid(row=0, column=0, sticky="ns")
 
     def _bind_events(self) -> None:
         """Подключает обработчики мыши, клавиатуры и списка видео."""
@@ -503,12 +500,65 @@ class TrackingPlayerWindow:
         self._video_listbox.bind("<Double-Button-1>", self._open_selected_video)
         self._video_listbox.bind("<Return>", self._open_selected_video)
 
-        self.root.bind("<space>", lambda _event: self._toggle_pause())
-        self.root.bind("<KeyPress-n>", lambda _event: self._step_once())
-        self.root.bind("<KeyPress-r>", lambda _event: self._reset_tracker())
-        self.root.bind("<KeyPress-q>", lambda _event: self._close())
-        self.root.bind("<Escape>", lambda _event: self._close())
+        self._install_keyboard_shortcuts()
         self.root.protocol("WM_DELETE_WINDOW", self._close)
+
+    def _iter_widgets(self, widget: tk.Widget):
+        """Обходит все виджеты окна, включая корневой."""
+
+        yield widget
+        for child in widget.winfo_children():
+            yield from self._iter_widgets(child)
+
+    def _install_keyboard_shortcuts(self) -> None:
+        """Ставит обработчик горячих клавиш раньше стандартных bind-ов Tk."""
+
+        self.root.bind_class(SHORTCUT_BINDTAG, "<KeyPress>", self._on_global_key_press)
+        self.root.bind_class(SHORTCUT_BINDTAG, "<KeyRelease>", self._on_global_key_release)
+        for widget in self._iter_widgets(self.root):
+            tags = widget.bindtags()
+            if SHORTCUT_BINDTAG not in tags:
+                widget.bindtags((SHORTCUT_BINDTAG, *tags))
+
+    def _keyboard_shortcut_should_wait(self, event: tk.Event) -> bool:
+        """Проверяет, не печатает ли пользователь сейчас в поле ввода."""
+
+        widget = getattr(event, "widget", None)
+        if widget is None:
+            return False
+        try:
+            widget_class = widget.winfo_class()
+        except tk.TclError:
+            return False
+        return widget_class in {"Entry", "TEntry", "TCombobox", "Text", "Spinbox", "TSpinbox"}
+
+    def _on_global_key_press(self, event: tk.Event) -> str | None:
+        """Обрабатывает горячие клавиши независимо от фокуса внутри окна."""
+
+        if self._keyboard_shortcut_should_wait(event):
+            return None
+
+        key = str(getattr(event, "keysym", "")).lower()
+        if key == "space":
+            return self._toggle_pause()
+        if key == "n":
+            return self._step_once()
+        if key == "r":
+            return self._reset_tracker()
+        if key == "q" or key == "escape":
+            return self._close()
+        return None
+
+    def _on_global_key_release(self, event: tk.Event) -> str | None:
+        """Гасит отпускание горячих клавиш, чтобы кнопки Tk не сработали следом."""
+
+        if self._keyboard_shortcut_should_wait(event):
+            return None
+
+        key = str(getattr(event, "keysym", "")).lower()
+        if key in {"space", "n", "r", "q", "escape"}:
+            return "break"
+        return None
 
     def _load_initial_directory(self, default_video: str) -> None:
         """Подхватывает стартовый каталог, чтобы список не был пустым с нуля."""
@@ -547,6 +597,9 @@ class TrackingPlayerWindow:
         self._refresh_view()
 
         if self.session.finished:
+            if self._record_video_var.get():
+                self._close_video_writer()
+                self._refresh_view()
             return
 
         speed_factor = self._get_speed_factor()
@@ -627,6 +680,8 @@ class TrackingPlayerWindow:
         if self.session is None:
             return "break"
 
+        if self._record_video_var.get():
+            self._close_video_writer()
         if not self.session.paused:
             self.session.toggle_pause()
         self.session.seek_to_frame(0)
@@ -1204,8 +1259,16 @@ class TrackingPlayerWindow:
         if not self._record_video_var.get():
             return "выключена"
         if self._record_output_path is None:
+            if self.session is not None and self.session.finished:
+                return "включена, последний файл закрыт"
+            if self.session is not None and self.session.paused:
+                return "пауза, файл ещё не открыт"
             return "включена, файл появится после старта"
-        return str(self._record_output_path)
+        if self._record_log_path is None:
+            return str(self._record_output_path)
+        if self.session is not None and self.session.paused:
+            return f"{self._record_output_path} | пауза, файл открыт | лог: {self._record_log_path.name}"
+        return f"{self._record_output_path} | лог: {self._record_log_path.name}"
 
     def _toggle_recording(self) -> None:
         """Включает или выключает запись и сразу обновляет интерфейс."""
@@ -1214,12 +1277,106 @@ class TrackingPlayerWindow:
             self._close_video_writer()
         self._refresh_view()
 
+    @staticmethod
+    def _record_bbox(bbox) -> dict[str, int] | None:
+        """Преобразует bbox в JSON-совместимый словарь."""
+
+        if bbox is None:
+            return None
+        return {
+            "x": int(bbox.x),
+            "y": int(bbox.y),
+            "width": int(bbox.width),
+            "height": int(bbox.height),
+        }
+
+    def _record_candidate(self, candidate) -> dict[str, object]:
+        """Преобразует найденного кандидата в запись для диагностического лога."""
+
+        return {
+            "bbox": self._record_bbox(candidate.bbox),
+            "area": int(candidate.area),
+            "confidence": float(candidate.confidence),
+            "label": str(candidate.label),
+            "source": str(candidate.source),
+            "track_id": candidate.track_id,
+            "class_id": candidate.class_id,
+        }
+
+    def _prepare_record_frame(self) -> np.ndarray | None:
+        """Готовит кадр к записи в mp4 с фиксированным чётным размером."""
+
+        if self._last_rendered_frame is None:
+            return None
+
+        frame = self._last_rendered_frame
+        if self._record_frame_size is None:
+            source_height, source_width = frame.shape[:2]
+            frame_width = source_width - source_width % 2
+            frame_height = source_height - source_height % 2
+            if frame_width <= 0 or frame_height <= 0:
+                return None
+            self._record_frame_size = (frame_width, frame_height)
+
+        target_width, target_height = self._record_frame_size
+        if frame.shape[1] != target_width or frame.shape[0] != target_height:
+            if frame.shape[1] >= target_width and frame.shape[0] >= target_height:
+                frame = frame[:target_height, :target_width]
+            else:
+                frame = cv2.resize(frame, (target_width, target_height), interpolation=cv2.INTER_AREA)
+
+        return np.ascontiguousarray(frame)
+
+    def _write_record_log_event(self, event_name: str) -> None:
+        """Пишет JSONL-событие рядом с записываемым видео."""
+
+        if self._record_log_file is None or self.session is None:
+            return
+
+        snapshot = self.session.current_snapshot
+        motion = snapshot.global_motion
+        frame_index = int(self.session.current_frame_index)
+        fps = max(self.session.fps, 1e-6)
+        event = {
+            "event": event_name,
+            "timestamp": datetime.now().isoformat(timespec="milliseconds"),
+            "video_path": self.session.options.video_path,
+            "record_video_path": str(self._record_output_path) if self._record_output_path is not None else "",
+            "preset_name": self.session.preset_name,
+            "pipeline_kind": self.session.preset.pipeline_kind,
+            "frame_index": frame_index,
+            "time_seconds": frame_index / fps,
+            "paused": bool(self.session.paused),
+            "finished": bool(self.session.finished),
+            "state": str(snapshot.state.value),
+            "track_id": snapshot.track_id,
+            "bbox": self._record_bbox(snapshot.bbox),
+            "predicted_bbox": self._record_bbox(snapshot.predicted_bbox),
+            "search_region": self._record_bbox(snapshot.search_region),
+            "score": float(snapshot.score),
+            "lost_frames": int(snapshot.lost_frames),
+            "global_motion": {
+                "dx": float(motion.dx),
+                "dy": float(motion.dy),
+                "response": float(motion.response),
+                "valid": bool(motion.valid),
+            },
+            "message": snapshot.message,
+            "candidate_count": len(self.session.candidate_objects),
+            "candidates": [self._record_candidate(candidate) for candidate in self.session.candidate_objects],
+        }
+        self._record_log_file.write(json.dumps(event, ensure_ascii=False) + "\n")
+        self._record_log_file.flush()
+
     def _ensure_video_writer(self) -> bool:
         """Лениво создаёт writer только когда действительно есть что писать."""
 
         if self._video_writer is not None:
             return True
         if self.session is None or self._last_rendered_frame is None:
+            return False
+        record_frame = self._prepare_record_frame()
+        if record_frame is None:
             return False
 
         output_dir = PROJECT_ROOT / "out"
@@ -1228,8 +1385,9 @@ class TrackingPlayerWindow:
         source_path = Path(self.session.options.video_path)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = output_dir / f"{source_path.stem}_{timestamp}.mp4"
+        log_path = output_path.with_suffix(".jsonl")
 
-        frame_height, frame_width = self._last_rendered_frame.shape[:2]
+        frame_height, frame_width = record_frame.shape[:2]
         fps = max(1.0, 1000.0 / max(1, self.session.safe_delay_ms))
         writer = cv2.VideoWriter(
             str(output_path),
@@ -1243,7 +1401,10 @@ class TrackingPlayerWindow:
 
         self._video_writer = writer
         self._record_output_path = output_path
+        self._record_log_path = log_path
+        self._record_log_file = log_path.open("w", encoding="utf-8")
         self._last_written_render_revision = -1
+        self._write_record_log_event("recording_started")
         return True
 
     def _write_record_frame_if_needed(self) -> None:
@@ -1253,6 +1414,8 @@ class TrackingPlayerWindow:
             return
         if self.session is None or self._last_rendered_frame is None:
             return
+        if self.session.paused or self.session.finished:
+            return
         if self.session.render_revision == self._last_written_render_revision:
             return
 
@@ -1260,7 +1423,11 @@ class TrackingPlayerWindow:
             if not self._ensure_video_writer():
                 return
             assert self._video_writer is not None
-            self._video_writer.write(self._last_rendered_frame)
+            record_frame = self._prepare_record_frame()
+            if record_frame is None:
+                return
+            self._video_writer.write(record_frame)
+            self._write_record_log_event("frame")
             self._last_written_render_revision = self.session.render_revision
         except Exception as exc:
             self._record_video_var.set(False)
@@ -1270,10 +1437,18 @@ class TrackingPlayerWindow:
     def _close_video_writer(self) -> None:
         """Закрывает активную запись, если она была открыта."""
 
+        if self._record_log_file is not None:
+            try:
+                self._write_record_log_event("recording_finished")
+            finally:
+                self._record_log_file.close()
+                self._record_log_file = None
         if self._video_writer is not None:
             self._video_writer.release()
             self._video_writer = None
         self._record_output_path = None
+        self._record_log_path = None
+        self._record_frame_size = None
         self._last_written_render_revision = -1
 
     def _toggle_pause(self) -> str:
@@ -1282,6 +1457,9 @@ class TrackingPlayerWindow:
         if self.session is None or self.session.finished:
             return "break"
         self.session.toggle_pause()
+        if self._record_log_file is not None:
+            event_name = "recording_paused" if self.session.paused else "recording_resumed"
+            self._write_record_log_event(event_name)
         self._refresh_view()
         self._schedule_tick(0)
         return "break"

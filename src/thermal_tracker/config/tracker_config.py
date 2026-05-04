@@ -1,4 +1,4 @@
-"""Runtime tracker config section exports."""
+"""Экспорт секции конфигурации runtime-трекера."""
 
 from .app_config import TrackerRunConfig
 

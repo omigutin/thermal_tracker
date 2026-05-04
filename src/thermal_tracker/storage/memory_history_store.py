@@ -1,4 +1,4 @@
-"""In-memory history store."""
+"""Хранилище истории в памяти."""
 
 from __future__ import annotations
 

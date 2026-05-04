@@ -21,8 +21,8 @@ def _draw_box(
     thickness: int,
     label: str | None = None,
     *,
-    font_scale: float = 0.6,
-    text_thickness: int = 2,
+    font_scale: float = 0.5,
+    text_thickness: int = 1,
 ) -> None:
     x, y, w, h = bbox.to_xywh()
     cv2.rectangle(image, (x, y), (x + w, y + h), color, thickness)
@@ -56,7 +56,7 @@ def _build_candidate_label(detection: DetectedObject) -> str:
 
     if detection.track_id is not None:
         return f"#{detection.track_id}"
-    return f"{detection.confidence:.2f}"
+    return ""
 
 
 def build_status_lines(
@@ -123,7 +123,7 @@ def render_frame(
     """Рисует рамки, подсказки и при необходимости старую OpenCV-панель."""
 
     canvas = frame.bgr.copy()
-    thickness = visualization.line_thickness
+    thickness = max(1, min(2, visualization.line_thickness))
 
     if visualization.show_search_region and snapshot.search_region is not None and snapshot.state == TrackerState.SEARCHING:
         _draw_box(canvas, snapshot.search_region, (0, 165, 255), 1)
@@ -145,8 +145,8 @@ def render_frame(
         _draw_box(canvas, snapshot.predicted_bbox, (255, 0, 255), 1)
 
     if snapshot.bbox is not None:
-        label = f"{snapshot.track_id} {snapshot.score:.2f}"
-        _draw_box(canvas, snapshot.bbox, (0, 255, 0), thickness, label)
+        label = f"#{snapshot.track_id}" if snapshot.track_id is not None else ""
+        _draw_box(canvas, snapshot.bbox, (0, 255, 0), thickness, label, font_scale=0.5, text_thickness=1)
 
     if pending_click is not None:
         cv2.circle(canvas, pending_click, 6, (0, 0, 255), -1)

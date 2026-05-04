@@ -1,9 +1,9 @@
-"""Обёртка над Ultralytics YOLO в режиме track().
+"""Интерфейс к Ultralytics YOLO в режиме track().
 
-Используем её как первый рабочий neural backend:
-- модель берёт кадр;
-- внешний tracker (ByteTrack/BoT-SORT) раздаёт track id;
-- на выходе получаем нормальный список `DetectedObject`.
+Используем его как временную реализацию до подключения общей библиотеки:
+- модель принимает кадр;
+- внешний tracker (ByteTrack/BoT-SORT) выдаёт track id;
+- на выходе получаем список `DetectedObject`.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from pathlib import Path
 import numpy as np
 from ultralytics import YOLO
 
-from ...config import NeuralConfig, PROJECT_ROOT
-from ...domain.models import BoundingBox, DetectedObject
-from .base_inference_engine import BaseInferenceEngine
+from ..config import NeuralConfig, PROJECT_ROOT
+from ..domain.models import BoundingBox, DetectedObject
+from .base_nnet_interface import BaseNnetInterface
 
 
 def _resolve_path(raw_path: str) -> str:
-    """Приводит относительный путь к абсолютному относительно корня проекта."""
+    """Приводит путь к абсолютному относительно корня проекта."""
 
     candidate = Path(raw_path).expanduser()
     if candidate.is_absolute():
@@ -27,15 +27,15 @@ def _resolve_path(raw_path: str) -> str:
     return str((PROJECT_ROOT / candidate).resolve())
 
 
-class UltralyticsYoloEngine(BaseInferenceEngine):
-    """Нейросетевой backend на базе `ultralytics.YOLO`."""
+class YoloNnetInterface(BaseNnetInterface):
+    """Адаптер к YOLO на базе `ultralytics.YOLO`."""
 
-    engine_name = "ultralytics_yolo"
+    interface_name = "yolo"
     is_ready = True
 
     def __init__(self, config: NeuralConfig) -> None:
         if not config.model_path.strip():
-            raise RuntimeError("Для neural pipeline не задан путь к файлу модели.")
+            raise RuntimeError("Для NN-сценария не задан путь к файлу модели.")
 
         self.config = config
         self.model_path = _resolve_path(config.model_path)
@@ -45,7 +45,7 @@ class UltralyticsYoloEngine(BaseInferenceEngine):
         self.mode_name = "track" if self._track_mode_enabled else "predict"
 
     def track(self, frame: np.ndarray) -> list[DetectedObject]:
-        """Запускает `model.track()` и возвращает детекции в наших структурах."""
+        """Запускает модель и возвращает детекции в доменных структурах."""
 
         results = self._run_model(frame)
         if not results:
@@ -84,7 +84,7 @@ class UltralyticsYoloEngine(BaseInferenceEngine):
                     area=bbox.area,
                     confidence=float(confs[index]) if index < len(confs) else 0.0,
                     label=label,
-                    source=f"{self.engine_name}_{self.mode_name}",
+                    source=f"{self.interface_name}_{self.mode_name}",
                     track_id=track_id,
                     class_id=class_id if class_id >= 0 else None,
                 )
@@ -93,11 +93,10 @@ class UltralyticsYoloEngine(BaseInferenceEngine):
         return detections
 
     def _check_track_mode_available(self) -> bool:
-        """Проверяет, можем ли реально использовать внешний tracker.
+        """Проверяет, можно ли использовать внешний tracker.
 
         Ultralytics для ByteTrack/BotSort требует пакет `lap`. Если его нет,
-        честно откатываемся на `predict()` и не устраиваем каждый запуск
-        мини-спектакль с бесполезной попыткой auto-install.
+        честно откатываемся на `predict()` и не запускаем автоустановку.
         """
 
         if not self.tracker_config_path:

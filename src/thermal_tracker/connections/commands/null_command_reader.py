@@ -1,4 +1,4 @@
-"""No-op command reader."""
+"""Пустой читатель команд."""
 
 from __future__ import annotations
 

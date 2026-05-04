@@ -1,4 +1,4 @@
-"""Create tracking scenarios by config name."""
+"""Создание сценариев трекинга по имени из конфига."""
 
 from __future__ import annotations
 

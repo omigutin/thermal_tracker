@@ -1,4 +1,4 @@
-"""Command reader implementations."""
+"""Реализации читателей команд."""
 
 from .base_command_reader import BaseCommandReader
 from .gui_command_reader import GuiCommandReader

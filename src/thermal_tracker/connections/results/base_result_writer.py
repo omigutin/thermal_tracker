@@ -1,4 +1,4 @@
-"""Result writer contract."""
+"""Контракт писателя результатов."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ class BaseResultWriter(ABC):
 
     @abstractmethod
     def write(self, result: Any) -> None:
-        """Write one processing result."""
+        """Записывает один результат обработки."""
 
     def close(self) -> None:
         pass

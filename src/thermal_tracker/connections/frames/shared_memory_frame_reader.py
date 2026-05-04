@@ -1,4 +1,4 @@
-"""Shared memory frame reader placeholder."""
+"""Заготовка читателя кадров из Shared Memory."""
 
 from __future__ import annotations
 

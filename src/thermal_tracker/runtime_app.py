@@ -1,4 +1,4 @@
-"""Headless runtime application assembly."""
+"""Сборка runtime-приложения без GUI."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class RuntimeApp:
                 close()
 
 
-def build_runtime_app(config_path: str = "presets/runtime.toml", *, initialize_scenario: bool = False) -> RuntimeApp:
+def build_runtime_app(config_path: str = "configs/runtime.toml", *, initialize_scenario: bool = False) -> RuntimeApp:
     config = load_app_config(config_path)
     app = RuntimeApp(
         config=config,
@@ -51,11 +51,11 @@ def build_runtime_app(config_path: str = "presets/runtime.toml", *, initialize_s
     return app
 
 
-def run_runtime(config_path: str = "presets/runtime.toml", *, initialize_scenario: bool = False) -> RuntimeApp:
-    """Build the headless runtime app from config.
+def run_runtime(config_path: str = "configs/runtime.toml", *, initialize_scenario: bool = False) -> RuntimeApp:
+    """Собирает runtime-приложение по конфигу.
 
-    The shared-memory readers/writers are placeholders for now, so this function
-    intentionally assembles the runtime without starting a blind processing loop.
+    Shared Memory reader/writer пока являются заготовками, поэтому функция
+    только собирает объекты и не запускает слепой цикл обработки.
     """
 
     return build_runtime_app(config_path, initialize_scenario=initialize_scenario)

@@ -1,4 +1,4 @@
-"""Shared memory command reader placeholder."""
+"""Заготовка читателя команд из Shared Memory."""
 
 from __future__ import annotations
 

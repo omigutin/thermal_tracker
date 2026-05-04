@@ -1,4 +1,4 @@
-"""Shared memory result writer placeholder."""
+"""Заготовка писателя результатов в Shared Memory."""
 
 from __future__ import annotations
 

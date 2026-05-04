@@ -1,4 +1,4 @@
-"""Algorithm preset loader exports."""
+"""Экспорт загрузчика алгоритмических пресетов."""
 
 from .preset import (
     AVAILABLE_PRESETS,

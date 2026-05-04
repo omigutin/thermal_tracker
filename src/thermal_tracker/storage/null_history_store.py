@@ -1,4 +1,4 @@
-"""No-op history store."""
+"""Пустое хранилище истории."""
 
 from __future__ import annotations
 

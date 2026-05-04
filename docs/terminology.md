@@ -13,6 +13,7 @@
 - Use `candidate` before target selection.
 - Use `target` after a target is selected for tracking.
 - Use `nn_` for neural-network implementations and scenarios.
+- Use `nnet_interface/` for the temporary NN integration interface.
 - Use `opencv_` only for implementations that directly use OpenCV or wrap an OpenCV algorithm.
 - Use `base_` for abstract contracts.
 - Use `no_` for no-op implementations.

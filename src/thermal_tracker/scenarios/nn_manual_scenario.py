@@ -1,4 +1,4 @@
-"""Neural pipeline для режима "кликнули по цели и ведём её".
+"""Сценарий NN для режима "кликнули по цели и ведём её".
 
 Текущая первая реализация построена вокруг:
 - YOLO как detector;
@@ -19,7 +19,7 @@ from ..processing_stages.target_tracking import YoloTrackSingleTargetTracker
 
 
 class ManualClickNeuralPipeline:
-    """Собирает рабочий neural-контур single-target tracking."""
+    """Собирает рабочий NN-контур сопровождения одной цели."""
 
     def __init__(self, preset_name: str, preset_override: TrackerPreset | None = None) -> None:
         self.preset: TrackerPreset = preset_override or build_preset(preset_name)

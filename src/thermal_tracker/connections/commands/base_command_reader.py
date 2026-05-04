@@ -1,4 +1,4 @@
-"""Command reader contract."""
+"""Контракт читателя команд."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ class BaseCommandReader(ABC):
 
     @abstractmethod
     def read(self) -> Any | None:
-        """Read one operator/runtime command if available."""
+        """Читает одну команду оператора или runtime, если она доступна."""
 
     def close(self) -> None:
         pass

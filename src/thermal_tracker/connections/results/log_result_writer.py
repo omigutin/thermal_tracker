@@ -1,4 +1,4 @@
-"""Log result writer."""
+"""Писатель результатов в лог."""
 
 from __future__ import annotations
 

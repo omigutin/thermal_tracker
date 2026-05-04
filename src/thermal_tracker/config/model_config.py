@@ -1,4 +1,4 @@
-"""Model config section exports."""
+"""Экспорт секции конфигурации модели."""
 
 from .app_config import ModelConfig
 

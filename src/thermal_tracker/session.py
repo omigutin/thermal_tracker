@@ -80,7 +80,7 @@ class TrackingSession:
 
     @property
     def fps(self) -> float:
-        """FPS активного источника видео."""
+        """Частота кадров активного источника видео."""
 
         return self.video_source.fps
 

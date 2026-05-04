@@ -19,7 +19,7 @@ def _resolve_csrt_factory():
 
 
 class CsrtSingleTargetTracker(BaseSingleTargetTracker):
-    """Single-target tracker на базе готового CSRT."""
+    """Трекер одной цели на базе готового CSRT."""
 
     implementation_name = "csrt"
     is_ready = True

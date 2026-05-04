@@ -1,4 +1,4 @@
-"""SQLite history store placeholder."""
+"""Заготовка SQLite-хранилища истории."""
 
 from __future__ import annotations
 

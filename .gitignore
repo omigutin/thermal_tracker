@@ -220,3 +220,7 @@ __marimo__/
 /artifacts/
 /video/
 /out/
+/models/yolo26m.pt
+/models/yolo26n.pt
+/models/yolo26s.pt
+/models/yolo26x.pt

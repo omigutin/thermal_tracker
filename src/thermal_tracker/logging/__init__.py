@@ -1,2 +1,1 @@
-"""Logging helpers live here when the runtime needs project-specific logging."""
-
+"""Место для logging-хелперов, когда runtime потребуется проектное логирование."""
