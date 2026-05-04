@@ -80,6 +80,7 @@ class TrackerConfig:
     max_size_shrink: float = 0.72  # Максимальное сжатие бокса за один обычный шаг.
     max_size_growth_on_reacquire: float = 1.6  # Насколько можно увеличить бокс при повторном захвате.
     max_size_shrink_on_reacquire: float = 0.55  # Насколько можно уменьшить бокс при повторном захвате.
+    max_size_growth_from_initial: float = 4.0  # Во сколько раз бокс может вырасти относительно стартового размера.
     max_feature_points: int = 40  # Верхняя граница числа опорных точек для LK-трекинга.
     min_feature_points: int = 6  # Нижняя граница числа опорных точек, ниже которой пора переинициализироваться.
     feature_quality_level: float = 0.02  # Порог качества углов при поиске опорных точек.
@@ -89,6 +90,8 @@ class TrackerConfig:
     max_tracking_center_shift: float = 1.45  # Максимальный допустимый сдвиг центра в обычном режиме.
     max_reacquire_center_shift: float = 2.4  # Максимальный допустимый сдвиг центра при повторном захвате.
     reacquire_center_growth: float = 0.28  # Как быстро расширяем допуск по центру при затянувшейся потере.
+    edge_exit_margin: int = 10  # Насколько близко к краю кадра цель считаем уходящей за границу.
+    edge_exit_max_lost_frames: int = 4  # Сколько кадров искать цель после потери прямо у края кадра.
 
 
 @dataclass

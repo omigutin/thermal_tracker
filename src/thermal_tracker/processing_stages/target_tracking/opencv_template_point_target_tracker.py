@@ -101,6 +101,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._tracked_points: np.ndarray | None = None
         self._point_center_offset = np.zeros(2, dtype=np.float32)
         self._frames_since_feature_refresh = 0
+        self._exit_edges: set[str] = set()
 
     def reset(self) -> TrackSnapshot:
         """Полностью сбрасывает состояние трекера."""
@@ -122,6 +123,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._tracked_points = None
         self._point_center_offset[:] = 0.0
         self._frames_since_feature_refresh = 0
+        self._exit_edges.clear()
         return self.snapshot(GlobalMotion())
 
     def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
@@ -156,6 +158,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         # Сразу набираем точки на объекте, чтобы не ехать только на шаблоне.
         self._initialize_feature_points(frame, bbox, force=True)
         self._previous_normalized = frame.normalized.copy()
+        self._update_exit_edges(bbox, frame.bgr.shape)
         return self.snapshot(GlobalMotion())
 
     def update(self, frame: ProcessedFrame, global_motion: GlobalMotion) -> TrackSnapshot:
@@ -175,21 +178,25 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             measured_bbox = refined.bbox if refined is not None else search.bbox
             measured_bbox = measured_bbox.clamp(frame.bgr.shape)
             measured_bbox = self._stabilize_bbox_size(measured_bbox, frame.bgr.shape)
-            self._update_velocity(measured_bbox, global_motion)
-            self._bbox = measured_bbox
-            self._predicted_bbox = predicted_bbox
-            self._search_region = search.search_region
-            self._lost_frames = 0
-            self._score = search.score
-            self._state = TrackerState.TRACKING
-            self._message = f"Tracking target #{self._track_id}"
+            if self._is_invalid_edge_reacquire(measured_bbox, frame.bgr.shape):
+                search = _SearchResult(bbox=measured_bbox, score=-1.0, search_region=search.search_region)
+            else:
+                self._update_velocity(measured_bbox, global_motion)
+                self._bbox = measured_bbox
+                self._predicted_bbox = predicted_bbox
+                self._search_region = search.search_region
+                self._lost_frames = 0
+                self._score = search.score
+                self._state = TrackerState.TRACKING
+                self._message = f"Tracking target #{self._track_id}"
+                self._update_exit_edges(measured_bbox, frame.bgr.shape)
 
-            if search.score >= self.config.template_update_threshold:
-                self._update_templates(frame, measured_bbox)
+                if search.score >= self.config.template_update_threshold:
+                    self._update_templates(frame, measured_bbox)
 
-            self._refresh_feature_points(frame, measured_bbox)
-            self._previous_normalized = frame.normalized.copy()
-            return self.snapshot(global_motion)
+                self._refresh_feature_points(frame, measured_bbox)
+                self._previous_normalized = frame.normalized.copy()
+                return self.snapshot(global_motion)
 
         self._lost_frames += 1
         self._predicted_bbox = predicted_bbox
@@ -200,11 +207,21 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         )
         self._score = search.score if search is not None else 0.0
 
+        if self._exit_edges and self._lost_frames > self.config.edge_exit_max_lost_frames:
+            self._message = "Target left frame, click again"
+            self._state = TrackerState.IDLE
+            self._bbox = None
+            self._tracked_points = None
+            self._exit_edges.clear()
+            self._previous_normalized = frame.normalized.copy()
+            return self.snapshot(global_motion)
+
         if self._lost_frames > self.config.max_lost_frames:
             self._message = "Target lost, click again"
             self._state = TrackerState.IDLE
             self._bbox = None
             self._tracked_points = None
+            self._exit_edges.clear()
             self._previous_normalized = frame.normalized.copy()
             return self.snapshot(global_motion)
 
@@ -480,6 +497,46 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         )
         return combined - distance_penalty - point_penalty
 
+    def _detect_edge_contact(
+        self,
+        bbox: BoundingBox,
+        frame_shape: tuple[int, int] | tuple[int, int, int],
+    ) -> set[str]:
+        """Возвращает стороны кадра, к которым цель подошла вплотную."""
+
+        frame_h, frame_w = frame_shape[:2]
+        margin = max(0, int(self.config.edge_exit_margin))
+        edges: set[str] = set()
+        if bbox.x <= margin:
+            edges.add("left")
+        if bbox.y <= margin:
+            edges.add("top")
+        if bbox.x2 >= frame_w - margin:
+            edges.add("right")
+        if bbox.y2 >= frame_h - margin:
+            edges.add("bottom")
+        return edges
+
+    def _update_exit_edges(
+        self,
+        bbox: BoundingBox,
+        frame_shape: tuple[int, int] | tuple[int, int, int],
+    ) -> None:
+        """Запоминает, что цель могла уйти за границу кадра."""
+
+        self._exit_edges = self._detect_edge_contact(bbox, frame_shape)
+
+    def _is_invalid_edge_reacquire(
+        self,
+        bbox: BoundingBox,
+        frame_shape: tuple[int, int] | tuple[int, int, int],
+    ) -> bool:
+        """Не даёт после выхода за край перескочить на похожее пятно внутри кадра."""
+
+        if self._state != TrackerState.SEARCHING or not self._exit_edges:
+            return False
+        return not self._exit_edges.intersection(self._detect_edge_contact(bbox, frame_shape))
+
     def _update_velocity(self, measured_bbox: BoundingBox, global_motion: GlobalMotion) -> None:
         """Обновляет остаточную скорость цели относительно движения камеры."""
         assert self._bbox is not None
@@ -532,6 +589,13 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
 
         stabilized_width = min(max(measured_bbox.width, min_width), max_width)
         stabilized_height = min(max(measured_bbox.height, min_height), max_height)
+        if self._canonical_size is not None:
+            initial_w, initial_h = self._canonical_size
+            initial_growth = max(1.0, float(self.config.max_size_growth_from_initial))
+            max_initial_width = max(self.config.min_box_size, int(round(initial_w * initial_growth)))
+            max_initial_height = max(self.config.min_box_size, int(round(initial_h * initial_growth)))
+            stabilized_width = min(stabilized_width, max_initial_width)
+            stabilized_height = min(stabilized_height, max_initial_height)
         cx, cy = measured_bbox.center
         return BoundingBox.from_center(cx, cy, stabilized_width, stabilized_height).clamp(frame_shape)
 

@@ -36,6 +36,8 @@ class TrackingSession:
         self.pipeline = self._build_pipeline(options)
         self.finished = False
         self._render_revision = 0
+        self.last_click_point: tuple[int, int] | None = None
+        self.last_click_frame_index: int | None = None
 
     @property
     def preset(self) -> TrackerPreset:
@@ -112,13 +114,18 @@ class TrackingSession:
 
     def request_click(self, point: tuple[int, int]) -> None:
         """Ставит в очередь клик по цели."""
-        self.runtime.pending_click = point
+        click_point = (int(point[0]), int(point[1]))
+        self.last_click_point = click_point
+        self.last_click_frame_index = self.current_frame_index
+        self.runtime.pending_click = click_point
         if self.runtime.paused and self.current_frame is not None:
             self.pipeline.apply_static_actions(self.runtime)
             self._render_revision += 1
 
     def request_reset(self) -> None:
         """Просит сбросить текущий трек."""
+        self.last_click_point = None
+        self.last_click_frame_index = None
         self.runtime.reset_requested = True
         if self.runtime.paused and self.current_frame is not None:
             self.pipeline.apply_static_actions(self.runtime)
@@ -148,6 +155,8 @@ class TrackingSession:
         paused_state = self.runtime.paused if keep_pause_state else True
         self.video_source.close()
         self.runtime = SessionRuntimeState(paused=paused_state)
+        self.last_click_point = None
+        self.last_click_frame_index = None
         self.video_source = OpenCvVideoSource(self.options.video_path)
         self.pipeline = self._build_pipeline(self.options)
         self.finished = False

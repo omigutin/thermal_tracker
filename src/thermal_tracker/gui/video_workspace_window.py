@@ -1290,6 +1290,17 @@ class TrackingPlayerWindow:
             "height": int(bbox.height),
         }
 
+    @staticmethod
+    def _record_point(point: tuple[int, int] | None) -> dict[str, int] | None:
+        """Преобразует точку кадра в JSON-совместимый словарь."""
+
+        if point is None:
+            return None
+        return {
+            "x": int(point[0]),
+            "y": int(point[1]),
+        }
+
     def _record_candidate(self, candidate) -> dict[str, object]:
         """Преобразует найденного кандидата в запись для диагностического лога."""
 
@@ -1348,6 +1359,9 @@ class TrackingPlayerWindow:
             "time_seconds": frame_index / fps,
             "paused": bool(self.session.paused),
             "finished": bool(self.session.finished),
+            "pending_click": self._record_point(self.session.pending_click),
+            "last_click_point": self._record_point(self.session.last_click_point),
+            "last_click_frame_index": self.session.last_click_frame_index,
             "state": str(snapshot.state.value),
             "track_id": snapshot.track_id,
             "bbox": self._record_bbox(snapshot.bbox),
@@ -1514,6 +1528,8 @@ class TrackingPlayerWindow:
         if self.session is None:
             return "break"
         self.session.request_click(point)
+        if self._record_log_file is not None:
+            self._write_record_log_event("click_requested")
         self._refresh_view()
         return "break"
 
