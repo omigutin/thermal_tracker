@@ -139,6 +139,14 @@ max_reacquire_center_shift = 2.9
 reacquire_center_growth = 0.34
 edge_exit_margin = 10
 edge_exit_max_lost_frames = 4
+# При длительном замутнении не сбрасываем цель сразу, а держим прогноз движения.
+blur_hold_enabled = true
+# Если резкость центральной части кадра просела сильнее этой доли, считаем кадр плохим.
+blur_sharpness_drop_ratio = 0.58
+# Дополнительный бюджет кадров для восстановления после замутнения.
+blur_hold_max_frames = 70
+# Дополнительное расширение допуска по центру после плохих кадров.
+blur_hold_center_growth = 0.075
 
 [visualization]
 # Показывать ли на кадре область текущего поиска.

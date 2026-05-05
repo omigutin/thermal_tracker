@@ -106,6 +106,9 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._exit_edges: set[str] = set()
         self._motion_model = KalmanMotionModel()
         self._camera_offset = np.zeros(2, dtype=np.float32)
+        self._sharpness_baseline: float | None = None
+        self._degraded_frames = 0
+        self._blur_hold_frames = 0
 
     def reset(self) -> TrackSnapshot:
         """Полностью сбрасывает состояние трекера."""
@@ -131,6 +134,9 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._exit_edges.clear()
         self._motion_model.reset()
         self._camera_offset[:] = 0.0
+        self._sharpness_baseline = None
+        self._degraded_frames = 0
+        self._blur_hold_frames = 0
         return self.snapshot(GlobalMotion())
 
     def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
@@ -159,6 +165,9 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._camera_offset[:] = 0.0
         self._target_polarity = self._resolve_target_polarity(frame, bbox, selection.polarity)
         self._motion_model.initialize(self._to_motion_model_bbox(bbox))
+        self._sharpness_baseline = self._measure_frame_sharpness(frame)
+        self._degraded_frames = 0
+        self._blur_hold_frames = 0
 
         self._long_term_gray = _safe_resize(gray_patch, self._canonical_size)
         self._long_term_grad = _safe_resize(grad_patch, self._canonical_size)
@@ -178,8 +187,10 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             self._previous_normalized = frame.normalized.copy()
             return self.snapshot(global_motion)
 
-        self._update_camera_offset(global_motion)
-        point_prediction = self._predict_from_points(frame)
+        frame_degraded = self._update_frame_quality_state(frame)
+        if not frame_degraded and not (self._state == TrackerState.SEARCHING and self._blur_hold_active()):
+            self._update_camera_offset(global_motion)
+        point_prediction = None if frame_degraded else self._predict_from_points(frame)
         predicted_bbox = self._predict_bbox(frame.bgr.shape, global_motion, point_prediction)
         search = self._locate_target(frame, predicted_bbox, point_prediction)
         threshold = self.config.track_threshold if self._state == TrackerState.TRACKING else self.config.reacquire_threshold
@@ -189,19 +200,27 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             measured_bbox = refined.bbox if refined is not None else search.bbox
             measured_bbox = measured_bbox.clamp(frame.bgr.shape)
             measured_bbox = self._stabilize_bbox_size(measured_bbox, frame.bgr.shape)
-            trusted_measurement = self._is_trusted_measurement(search.score, measured_bbox, predicted_bbox)
+            trusted_measurement = self._is_trusted_measurement(
+                search.score,
+                measured_bbox,
+                predicted_bbox,
+                frame_degraded=frame_degraded,
+            )
             if (
                 self._is_invalid_motion_candidate(measured_bbox, predicted_bbox)
                 or self._is_invalid_edge_candidate(
                     measured_bbox,
                     frame.bgr.shape,
                 )
+                or (frame_degraded and not trusted_measurement)
                 or (self._state == TrackerState.SEARCHING and not trusted_measurement)
             ):
                 search = _SearchResult(bbox=measured_bbox, score=-1.0, search_region=search.search_region)
             else:
                 if trusted_measurement:
-                    self._update_velocity(measured_bbox, global_motion)
+                    if not frame_degraded:
+                        self._update_velocity(measured_bbox, global_motion)
+                        self._update_sharpness_baseline(frame)
                     self._motion_model.update(self._to_motion_model_bbox(measured_bbox))
                 self._bbox = measured_bbox
                 self._predicted_bbox = predicted_bbox
@@ -209,13 +228,20 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
                 self._lost_frames = 0
                 self._score = search.score
                 self._state = TrackerState.TRACKING
-                self._message = f"Tracking target #{self._track_id}"
+                self._message = (
+                    f"Holding target #{self._track_id} through degraded frame"
+                    if frame_degraded
+                    else f"Tracking target #{self._track_id}"
+                )
                 self._update_exit_edges(measured_bbox, frame.bgr.shape)
 
-                if search.score >= self.config.template_update_threshold:
+                if not frame_degraded and search.score >= self.config.template_update_threshold:
                     self._update_templates(frame, measured_bbox)
 
-                self._refresh_feature_points(frame, measured_bbox)
+                if frame_degraded:
+                    self._tracked_points = None
+                else:
+                    self._refresh_feature_points(frame, measured_bbox)
                 self._previous_normalized = frame.normalized.copy()
                 return self.snapshot(global_motion)
 
@@ -237,7 +263,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             self._previous_normalized = frame.normalized.copy()
             return self.snapshot(global_motion)
 
-        if self._lost_frames > self.config.max_lost_frames:
+        if self._lost_frames > self._current_max_lost_frames():
             self._message = "Target lost, click again"
             self._state = TrackerState.IDLE
             self._bbox = None
@@ -247,7 +273,11 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             return self.snapshot(global_motion)
 
         self._state = TrackerState.SEARCHING
-        self._message = f"Searching for target #{self._track_id}"
+        self._message = (
+            f"Frame degraded, holding prediction #{self._track_id}"
+            if frame_degraded
+            else f"Searching for target #{self._track_id}"
+        )
         self._previous_normalized = frame.normalized.copy()
         return self.snapshot(global_motion)
 
@@ -634,6 +664,69 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         background_level = float(np.median(background_values))
         return object_hot_level, object_cold_level, background_level
 
+    def _measure_frame_sharpness(self, frame: ProcessedFrame) -> float:
+        """Оценивает резкость центральной части кадра без служебных надписей по краям."""
+
+        gray = frame.gray
+        frame_h, frame_w = gray.shape[:2]
+        x1 = int(round(frame_w * 0.08))
+        x2 = int(round(frame_w * 0.92))
+        y1 = int(round(frame_h * 0.18))
+        y2 = int(round(frame_h * 0.82))
+        roi = gray[y1:y2, x1:x2]
+        if roi.size == 0:
+            roi = gray
+
+        laplacian = cv2.Laplacian(roi, cv2.CV_32F, ksize=3)
+        return float(np.percentile(np.abs(laplacian), 90))
+
+    def _update_frame_quality_state(self, frame: ProcessedFrame) -> bool:
+        """Определяет, похож ли текущий кадр на замутнённый, и включает удержание прогноза."""
+
+        if not self.config.blur_hold_enabled:
+            self._degraded_frames = 0
+            self._blur_hold_frames = 0
+            return False
+
+        sharpness = self._measure_frame_sharpness(frame)
+        if self._sharpness_baseline is None:
+            self._sharpness_baseline = max(sharpness, 1e-6)
+            return False
+
+        baseline = max(self._sharpness_baseline, 1e-6)
+        degraded = sharpness <= baseline * self.config.blur_sharpness_drop_ratio
+        if degraded:
+            self._degraded_frames += 1
+            self._blur_hold_frames = max(self._blur_hold_frames, self.config.blur_hold_max_frames)
+        else:
+            self._degraded_frames = 0
+            if self._blur_hold_frames > 0:
+                self._blur_hold_frames -= 1
+        return degraded
+
+    def _update_sharpness_baseline(self, frame: ProcessedFrame) -> None:
+        """Обновляет нормальную резкость только по уверенным, не замутнённым кадрам."""
+
+        sharpness = self._measure_frame_sharpness(frame)
+        if self._sharpness_baseline is None:
+            self._sharpness_baseline = max(sharpness, 1e-6)
+            return
+
+        alpha = 0.06
+        self._sharpness_baseline = self._sharpness_baseline * (1.0 - alpha) + sharpness * alpha
+
+    def _blur_hold_active(self) -> bool:
+        """Возвращает, что мы всё ещё восстанавливаемся после замутнения."""
+
+        return self.config.blur_hold_enabled and (self._degraded_frames > 0 or self._blur_hold_frames > 0)
+
+    def _current_max_lost_frames(self) -> int:
+        """Даёт дополнительный бюджет потери, если кадр недавно был замутнён."""
+
+        if not self._blur_hold_active():
+            return self.config.max_lost_frames
+        return self.config.max_lost_frames + self.config.blur_hold_max_frames
+
     def _detect_edge_contact(
         self,
         bbox: BoundingBox,
@@ -687,7 +780,10 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         if self._lost_frames == 0:
             allowed_error = max(8.0, max_dimension * 1.25)
         else:
-            allowed_error = max(12.0, max_dimension * (1.35 + 0.04 * min(self._lost_frames, 20)))
+            growth = 0.04 * min(self._lost_frames, 20)
+            if self._blur_hold_active():
+                growth += self.config.blur_hold_center_growth * min(self._lost_frames, 30)
+            allowed_error = max(12.0, max_dimension * (1.35 + growth))
         return center_error > allowed_error
 
     def _is_trusted_measurement(
@@ -695,6 +791,8 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         score: float,
         measured_bbox: BoundingBox,
         predicted_bbox: BoundingBox,
+        *,
+        frame_degraded: bool,
     ) -> bool:
         """Разрешает обновлять траекторию только по достаточно надёжному совпадению."""
 
@@ -702,9 +800,25 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         measured_center = np.array(measured_bbox.center, dtype=np.float32)
         center_error = float(np.linalg.norm(measured_center - predicted_center))
         max_dimension = max(predicted_bbox.width, predicted_bbox.height, self.config.min_box_size)
+        if frame_degraded:
+            strict_score = max(
+                self.config.template_update_threshold + 0.12,
+                self.config.reacquire_threshold + 0.20,
+            )
+            if self._state == TrackerState.TRACKING:
+                allowed_error = max(5.0, max_dimension * 0.8)
+            else:
+                allowed_error = max(7.0, max_dimension * 1.1)
+            return score >= strict_score and center_error <= allowed_error
+
         if score >= self.config.template_update_threshold:
             if self._state == TrackerState.SEARCHING:
-                allowed_error = max(10.0, max_dimension * (1.45 + 0.03 * min(self._lost_frames, 20)))
+                growth = 0.03 * min(self._lost_frames, 20)
+                if self._blur_hold_active():
+                    growth += self.config.blur_hold_center_growth * min(self._lost_frames, 30)
+                allowed_error = max(10.0, max_dimension * (1.45 + growth))
+                if self._blur_hold_active() and center_error > max(14.0, max_dimension * 2.4):
+                    return score >= self.config.template_update_threshold + 0.10 and center_error <= allowed_error
                 return center_error <= allowed_error
             return True
 
