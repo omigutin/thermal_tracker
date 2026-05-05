@@ -27,7 +27,7 @@ def run_gui(
     """Открывает интерактивный GUI с настройками из run-конфига."""
 
     app_config = load_app_config(config_path)
-    preset_name = default_preset or default_preset_for_scenario(app_config.app.scenario)
+    preset_name = default_preset or app_config.app.preset or default_preset_for_scenario(app_config.app.scenario)
     if preset_name not in AVAILABLE_PRESETS:
         preset_name = DEFAULT_PRESET_NAME
 

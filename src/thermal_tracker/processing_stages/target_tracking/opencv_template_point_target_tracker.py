@@ -23,6 +23,7 @@ from ...config import ClickSelectionConfig, TrackerConfig
 from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..target_selection import ClickTargetSelector
 from .base_target_tracker import BaseSingleTargetTracker
+from .motion_models import KalmanMotionModel
 
 
 def _safe_resize(image: np.ndarray, size: tuple[int, int]) -> np.ndarray:
@@ -99,9 +100,12 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._adaptive_grad: np.ndarray | None = None
         self._previous_normalized: np.ndarray | None = None
         self._tracked_points: np.ndarray | None = None
+        self._target_polarity = "unknown"
         self._point_center_offset = np.zeros(2, dtype=np.float32)
         self._frames_since_feature_refresh = 0
         self._exit_edges: set[str] = set()
+        self._motion_model = KalmanMotionModel()
+        self._camera_offset = np.zeros(2, dtype=np.float32)
 
     def reset(self) -> TrackSnapshot:
         """Полностью сбрасывает состояние трекера."""
@@ -121,9 +125,12 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._adaptive_grad = None
         self._previous_normalized = None
         self._tracked_points = None
+        self._target_polarity = "unknown"
         self._point_center_offset[:] = 0.0
         self._frames_since_feature_refresh = 0
         self._exit_edges.clear()
+        self._motion_model.reset()
+        self._camera_offset[:] = 0.0
         return self.snapshot(GlobalMotion())
 
     def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
@@ -149,6 +156,9 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._score = 1.0
         self._message = f"Selected target #{self._track_id}"
         self._residual_velocity[:] = 0.0
+        self._camera_offset[:] = 0.0
+        self._target_polarity = self._resolve_target_polarity(frame, bbox, selection.polarity)
+        self._motion_model.initialize(self._to_motion_model_bbox(bbox))
 
         self._long_term_gray = _safe_resize(gray_patch, self._canonical_size)
         self._long_term_grad = _safe_resize(grad_patch, self._canonical_size)
@@ -168,8 +178,9 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             self._previous_normalized = frame.normalized.copy()
             return self.snapshot(global_motion)
 
+        self._update_camera_offset(global_motion)
         point_prediction = self._predict_from_points(frame)
-        predicted_bbox = point_prediction.bbox if point_prediction is not None else self._predict_bbox(frame.bgr.shape, global_motion)
+        predicted_bbox = self._predict_bbox(frame.bgr.shape, global_motion, point_prediction)
         search = self._locate_target(frame, predicted_bbox, point_prediction)
         threshold = self.config.track_threshold if self._state == TrackerState.TRACKING else self.config.reacquire_threshold
 
@@ -178,10 +189,20 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             measured_bbox = refined.bbox if refined is not None else search.bbox
             measured_bbox = measured_bbox.clamp(frame.bgr.shape)
             measured_bbox = self._stabilize_bbox_size(measured_bbox, frame.bgr.shape)
-            if self._is_invalid_edge_reacquire(measured_bbox, frame.bgr.shape):
+            trusted_measurement = self._is_trusted_measurement(search.score, measured_bbox, predicted_bbox)
+            if (
+                self._is_invalid_motion_candidate(measured_bbox, predicted_bbox)
+                or self._is_invalid_edge_candidate(
+                    measured_bbox,
+                    frame.bgr.shape,
+                )
+                or (self._state == TrackerState.SEARCHING and not trusted_measurement)
+            ):
                 search = _SearchResult(bbox=measured_bbox, score=-1.0, search_region=search.search_region)
             else:
-                self._update_velocity(measured_bbox, global_motion)
+                if trusted_measurement:
+                    self._update_velocity(measured_bbox, global_motion)
+                    self._motion_model.update(self._to_motion_model_bbox(measured_bbox))
                 self._bbox = measured_bbox
                 self._predicted_bbox = predicted_bbox
                 self._search_region = search.search_region
@@ -249,9 +270,27 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self,
         frame_shape: tuple[int, int] | tuple[int, int, int],
         global_motion: GlobalMotion,
+        point_prediction: _PointPrediction | None = None,
     ) -> BoundingBox:
-        """Строит прогноз по прошлому боксу, скорости цели и сдвигу камеры."""
+        """Строит прогноз по модели движения, точкам и сдвигу камеры."""
         assert self._bbox is not None
+
+        motion_prediction = self._motion_model.predict()
+        if motion_prediction is not None:
+            predicted = self._from_motion_model_bbox(motion_prediction, frame_shape)
+            if point_prediction is not None:
+                predicted_center = np.array(predicted.center, dtype=np.float32)
+                point_center = np.array(point_prediction.bbox.center, dtype=np.float32)
+                max_dimension = max(predicted.width, predicted.height, self.config.min_box_size)
+                if float(np.linalg.norm(point_center - predicted_center)) <= max_dimension * 1.8:
+                    blended_center = predicted_center * 0.72 + point_center * 0.28
+                    predicted = BoundingBox.from_center(
+                        blended_center[0],
+                        blended_center[1],
+                        predicted.width,
+                        predicted.height,
+                    ).clamp(frame_shape)
+            return predicted
 
         previous_center = np.array(self._bbox.center, dtype=np.float32)
         motion_shift = np.array([global_motion.dx, global_motion.dy], dtype=np.float32) if global_motion.valid else 0.0
@@ -405,8 +444,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
 
         candidates = []
         for response in (response_primary, response_fallback):
-            _, max_value, _, max_location = cv2.minMaxLoc(response)
-            candidates.append((float(max_value), max_location))
+            candidates.extend(self._collect_template_candidates(response, candidate_width, candidate_height))
 
         best_score = -1.0
         best_bbox: BoundingBox | None = None
@@ -433,6 +471,31 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             return None
 
         return _SearchResult(bbox=best_bbox, score=best_score, search_region=search_region)
+
+    def _collect_template_candidates(
+        self,
+        response: np.ndarray,
+        candidate_width: int,
+        candidate_height: int,
+        limit: int = 8,
+    ) -> list[tuple[float, tuple[int, int]]]:
+        """Берёт несколько локальных максимумов, а не только самый яркий ответ шаблона."""
+
+        work = response.copy()
+        candidates: list[tuple[float, tuple[int, int]]] = []
+        suppression_radius = max(3, min(candidate_width, candidate_height) // 2)
+        for _ in range(limit):
+            _, max_value, _, max_location = cv2.minMaxLoc(work)
+            if float(max_value) <= 0.05:
+                break
+            candidates.append((float(max_value), max_location))
+            x, y = max_location
+            left = max(0, x - suppression_radius)
+            right = min(work.shape[1], x + suppression_radius + 1)
+            top = max(0, y - suppression_radius)
+            bottom = min(work.shape[0], y + suppression_radius + 1)
+            work[top:bottom, left:right] = -1.0
+        return candidates
 
     def _score_candidate(
         self,
@@ -462,6 +525,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         gray_long = _correlation(normalized_gray, self._long_term_gray)
         grad_adaptive = _correlation(normalized_grad, self._adaptive_grad)
         grad_long = _correlation(normalized_grad, self._long_term_grad)
+        contrast_score = self._local_contrast_score(frame, candidate_bbox)
 
         predicted_center = np.array(predicted_bbox.center, dtype=np.float32)
         candidate_center = np.array(candidate_bbox.center, dtype=np.float32)
@@ -490,12 +554,85 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
 
         combined = (
             template_score * 0.24
-            + gray_adaptive * 0.30
-            + gray_long * 0.18
-            + grad_adaptive * 0.16
-            + grad_long * 0.08
+            + gray_adaptive * 0.27
+            + gray_long * 0.16
+            + grad_adaptive * 0.14
+            + grad_long * 0.07
+            + contrast_score * 0.12
         )
         return combined - distance_penalty - point_penalty
+
+    def _resolve_target_polarity(
+        self,
+        frame: ProcessedFrame,
+        bbox: BoundingBox,
+        selection_polarity: str,
+    ) -> str:
+        """Определяет, цель горячее или холоднее локального фона."""
+
+        if selection_polarity in {"hot", "cold"}:
+            return selection_polarity
+
+        levels = self._measure_local_contrast_levels(frame, bbox)
+        if levels is None:
+            return "hot"
+
+        object_hot_level, object_cold_level, background_level = levels
+        hot_contrast = object_hot_level - background_level
+        cold_contrast = background_level - object_cold_level
+        return "hot" if hot_contrast >= cold_contrast else "cold"
+
+    def _local_contrast_score(self, frame: ProcessedFrame, bbox: BoundingBox) -> float:
+        """Оценивает, насколько кандидат отделяется от локального фона."""
+
+        levels = self._measure_local_contrast_levels(frame, bbox)
+        if levels is None:
+            return -0.2
+
+        object_hot_level, object_cold_level, background_level = levels
+        if self._target_polarity == "cold":
+            contrast = background_level - object_cold_level
+        else:
+            contrast = object_hot_level - background_level
+
+        min_contrast = max(float(self.selector.config.min_object_contrast), 1.0)
+        normalized = (contrast - min_contrast * 0.5) / (min_contrast * 4.0)
+        return float(np.clip(normalized, -1.0, 1.0))
+
+    def _measure_local_contrast_levels(
+        self,
+        frame: ProcessedFrame,
+        bbox: BoundingBox,
+    ) -> tuple[float, float, float] | None:
+        """Измеряет яркость кандидата и фона в кольце вокруг него."""
+
+        image = frame.normalized
+        clamped = bbox.clamp(image.shape)
+        object_patch = image[clamped.y:clamped.y2, clamped.x:clamped.x2]
+        if object_patch.size == 0:
+            return None
+
+        margin = max(4, min(18, int(round(max(clamped.width, clamped.height) * 1.25))))
+        outer = clamped.pad(margin, margin).clamp(image.shape)
+        ring_patch = image[outer.y:outer.y2, outer.x:outer.x2]
+        if ring_patch.size == 0:
+            return None
+
+        ring_mask = np.ones(ring_patch.shape, dtype=bool)
+        inner_x1 = clamped.x - outer.x
+        inner_y1 = clamped.y - outer.y
+        inner_x2 = inner_x1 + clamped.width
+        inner_y2 = inner_y1 + clamped.height
+        ring_mask[inner_y1:inner_y2, inner_x1:inner_x2] = False
+        background_values = ring_patch[ring_mask]
+        if background_values.size < 8:
+            return None
+
+        object_values = object_patch.reshape(-1)
+        object_hot_level = float(np.percentile(object_values, 75))
+        object_cold_level = float(np.percentile(object_values, 25))
+        background_level = float(np.median(background_values))
+        return object_hot_level, object_cold_level, background_level
 
     def _detect_edge_contact(
         self,
@@ -526,16 +663,78 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
 
         self._exit_edges = self._detect_edge_contact(bbox, frame_shape)
 
-    def _is_invalid_edge_reacquire(
+    def _is_invalid_edge_candidate(
         self,
         bbox: BoundingBox,
         frame_shape: tuple[int, int] | tuple[int, int, int],
     ) -> bool:
         """Не даёт после выхода за край перескочить на похожее пятно внутри кадра."""
 
-        if self._state != TrackerState.SEARCHING or not self._exit_edges:
+        if not self._exit_edges:
             return False
         return not self._exit_edges.intersection(self._detect_edge_contact(bbox, frame_shape))
+
+    def _is_invalid_motion_candidate(self, bbox: BoundingBox, predicted_bbox: BoundingBox) -> bool:
+        """Отсекает кандидата, который ломает уже набранную траекторию."""
+
+        if self._bbox is None:
+            return False
+
+        predicted_center = np.array(predicted_bbox.center, dtype=np.float32)
+        measured_center = np.array(bbox.center, dtype=np.float32)
+        center_error = float(np.linalg.norm(measured_center - predicted_center))
+        max_dimension = max(predicted_bbox.width, predicted_bbox.height, self.config.min_box_size)
+        if self._lost_frames == 0:
+            allowed_error = max(8.0, max_dimension * 1.25)
+        else:
+            allowed_error = max(12.0, max_dimension * (1.35 + 0.04 * min(self._lost_frames, 20)))
+        return center_error > allowed_error
+
+    def _is_trusted_measurement(
+        self,
+        score: float,
+        measured_bbox: BoundingBox,
+        predicted_bbox: BoundingBox,
+    ) -> bool:
+        """Разрешает обновлять траекторию только по достаточно надёжному совпадению."""
+
+        predicted_center = np.array(predicted_bbox.center, dtype=np.float32)
+        measured_center = np.array(measured_bbox.center, dtype=np.float32)
+        center_error = float(np.linalg.norm(measured_center - predicted_center))
+        max_dimension = max(predicted_bbox.width, predicted_bbox.height, self.config.min_box_size)
+        if score >= self.config.template_update_threshold:
+            if self._state == TrackerState.SEARCHING:
+                allowed_error = max(10.0, max_dimension * (1.45 + 0.03 * min(self._lost_frames, 20)))
+                return center_error <= allowed_error
+            return True
+
+        close_to_prediction = center_error <= max(6.0, max_dimension * 0.75)
+        almost_confident = score >= self.config.track_threshold + 0.04
+        return self._state == TrackerState.TRACKING and close_to_prediction and almost_confident
+
+    def _update_camera_offset(self, global_motion: GlobalMotion) -> None:
+        """Копит сдвиг камеры с момента выбора текущей цели."""
+
+        if not global_motion.valid:
+            return
+        self._camera_offset += np.array([global_motion.dx, global_motion.dy], dtype=np.float32)
+
+    def _to_motion_model_bbox(self, bbox: BoundingBox) -> BoundingBox:
+        """Переводит bbox из координат кадра в координаты, компенсированные сдвигом камеры."""
+
+        center = np.array(bbox.center, dtype=np.float32) - self._camera_offset
+        return BoundingBox.from_center(center[0], center[1], bbox.width, bbox.height)
+
+    def _from_motion_model_bbox(
+        self,
+        bbox: BoundingBox,
+        frame_shape: tuple[int, int] | tuple[int, int, int],
+    ) -> BoundingBox:
+        """Возвращает прогноз модели движения обратно в координаты текущего кадра."""
+
+        assert self._bbox is not None
+        center = np.array(bbox.center, dtype=np.float32) + self._camera_offset
+        return BoundingBox.from_center(center[0], center[1], self._bbox.width, self._bbox.height).clamp(frame_shape)
 
     def _update_velocity(self, measured_bbox: BoundingBox, global_motion: GlobalMotion) -> None:
         """Обновляет остаточную скорость цели относительно движения камеры."""

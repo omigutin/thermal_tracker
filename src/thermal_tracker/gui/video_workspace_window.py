@@ -70,6 +70,7 @@ class TrackingPlayerWindow:
         self._video_writer: cv2.VideoWriter | None = None
         self._last_written_render_revision = -1
         self._display_box = (0, 0, 1, 1, 1, 1)
+        self._last_info_text = ""
 
         self._source_label_to_kind = {label: kind for kind, label in SOURCE_KIND_LABELS.items()}
         self._preset_name_to_display = self._build_preset_display_map()
@@ -781,9 +782,24 @@ class TrackingPlayerWindow:
                 f"{text}"
             )
 
+        if full_text == self._last_info_text:
+            return
+        if self._is_info_text_user_active():
+            return
+
         self._info_text.configure(state="normal")
         self._info_text.delete("1.0", tk.END)
         self._info_text.insert("1.0", full_text)
+        self._last_info_text = full_text
+
+    def _is_info_text_user_active(self) -> bool:
+        """Проверяет, не выделяет ли пользователь текст в технической панели."""
+
+        if self._info_text is None:
+            return False
+        if self._info_text.tag_ranges(tk.SEL):
+            return True
+        return self.root.focus_get() is self._info_text
 
     def _refresh_video_frame(self) -> None:
         """Готовит новый кадр для правой панели."""

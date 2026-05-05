@@ -25,7 +25,8 @@ class RuntimeApp:
         if self.scenario is None:
             from .scenarios import ScenarioFactory
 
-            self.scenario = ScenarioFactory.create(self.scenario_name)
+            preset_name = self.config.app.preset or None
+            self.scenario = ScenarioFactory.create(self.scenario_name, preset_name=preset_name)
         return self.scenario
 
     def close(self) -> None:

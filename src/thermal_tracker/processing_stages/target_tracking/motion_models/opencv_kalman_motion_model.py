@@ -57,10 +57,10 @@ class KalmanMotionModel(BaseMotionModel):
             return None
         prediction = self._filter.predict()
         return BoundingBox(
-            x=int(round(float(prediction[0]))),
-            y=int(round(float(prediction[1]))),
-            width=max(1, int(round(float(prediction[2])))),
-            height=max(1, int(round(float(prediction[3])))),
+            x=int(round(float(prediction[0, 0]))),
+            y=int(round(float(prediction[1, 0]))),
+            width=max(1, int(round(float(prediction[2, 0])))),
+            height=max(1, int(round(float(prediction[3, 0])))),
         )
 
     def update(self, bbox: BoundingBox) -> None:

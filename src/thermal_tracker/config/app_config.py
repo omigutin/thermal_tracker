@@ -15,6 +15,7 @@ T = TypeVar("T")
 class AppConfig:
     mode: str = "dev"
     scenario: str = "nn_manual"
+    preset: str = ""
 
 
 @dataclass(frozen=True)

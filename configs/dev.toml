@@ -1,6 +1,7 @@
 [app]
 mode = "dev"
-scenario = "nn_manual"
+scenario = "opencv_manual"
+preset = "opencv_small_target"
 
 [connections.frames]
 reader = "opencv_video"
