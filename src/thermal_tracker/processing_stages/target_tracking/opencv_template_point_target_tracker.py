@@ -194,6 +194,10 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         predicted_bbox = self._predict_bbox(frame.bgr.shape, global_motion, point_prediction)
         search = self._locate_target(frame, predicted_bbox, point_prediction)
         threshold = self.config.track_threshold if self._state == TrackerState.TRACKING else self.config.reacquire_threshold
+        if search is None or search.score < threshold:
+            contrast_search = self._locate_by_contrast(frame, predicted_bbox, frame_degraded=frame_degraded)
+            if contrast_search is not None and (search is None or contrast_search.score > search.score):
+                search = contrast_search
 
         if search is not None and search.score >= threshold:
             refined = self.selector.refine(frame, search.bbox)
@@ -235,7 +239,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
                 )
                 self._update_exit_edges(measured_bbox, frame.bgr.shape)
 
-                if not frame_degraded and search.score >= self.config.template_update_threshold:
+                if not frame_degraded and self._can_update_templates(measured_bbox, search.score):
                     self._update_templates(frame, measured_bbox)
 
                 if frame_degraded:
@@ -455,6 +459,47 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
                 best_result = candidate
 
         return best_result
+
+    def _locate_by_contrast(
+        self,
+        frame: ProcessedFrame,
+        predicted_bbox: BoundingBox,
+        *,
+        frame_degraded: bool,
+    ) -> _SearchResult | None:
+        """Ищет яркую/холодную компоненту рядом с прогнозом, когда шаблон не сработал."""
+
+        point = (int(predicted_bbox.center[0]), int(predicted_bbox.center[1]))
+        selection = self.selector.select(frame, point, expected_bbox=predicted_bbox)
+        if selection.confidence < 0.7:
+            return None
+        if self._target_polarity in {"hot", "cold"} and selection.polarity != self._target_polarity:
+            return None
+
+        candidate_bbox = selection.bbox.clamp(frame.bgr.shape)
+        candidate_center = np.array(candidate_bbox.center, dtype=np.float32)
+        predicted_center = np.array(predicted_bbox.center, dtype=np.float32)
+        center_error = float(np.linalg.norm(candidate_center - predicted_center))
+        max_dimension = max(predicted_bbox.width, predicted_bbox.height, self.config.min_box_size)
+        if self._state == TrackerState.TRACKING:
+            allowed_error = max(8.0, max_dimension * 0.95)
+        else:
+            allowed_error = max(12.0, max_dimension * (1.15 + 0.05 * min(self._lost_frames, 12)))
+        if center_error > allowed_error:
+            return None
+
+        width_ratio = candidate_bbox.width / max(float(predicted_bbox.width), 1.0)
+        height_ratio = candidate_bbox.height / max(float(predicted_bbox.height), 1.0)
+        if max(width_ratio, height_ratio) > 1.8 or min(width_ratio, height_ratio) < 0.45:
+            return None
+
+        search_region = self._build_search_region(predicted_bbox, frame.bgr.shape, use_tight_margin=False)
+        score = (
+            max(self.config.template_update_threshold + 0.14, self.config.reacquire_threshold + 0.22)
+            if frame_degraded
+            else min(self.config.template_update_threshold - 0.02, self.config.track_threshold + 0.18)
+        )
+        return _SearchResult(bbox=candidate_bbox, score=score, search_region=search_region)
 
     def _evaluate_template_pair(
         self,
@@ -879,6 +924,21 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._adaptive_gray = cv2.addWeighted(new_gray, alpha, adaptive_gray, 1.0 - alpha, 0.0).astype(np.uint8)
         self._adaptive_grad = cv2.addWeighted(new_grad, alpha, adaptive_grad, 1.0 - alpha, 0.0).astype(np.uint8)
 
+    def _can_update_templates(self, bbox: BoundingBox, score: float) -> bool:
+        """Не даёт адаптивному шаблону обучиться на соседней похожей цели."""
+
+        if score < self.config.template_update_threshold:
+            return False
+        if self._canonical_size is None:
+            return True
+
+        canonical_w, canonical_h = self._canonical_size
+        width_ratio = bbox.width / max(float(canonical_w), 1.0)
+        height_ratio = bbox.height / max(float(canonical_h), 1.0)
+        if max(width_ratio, height_ratio) > 1.28 and score < self.config.template_update_threshold + 0.18:
+            return False
+        return True
+
     def _stabilize_bbox_size(
         self,
         measured_bbox: BoundingBox,
@@ -904,13 +964,26 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         stabilized_height = min(max(measured_bbox.height, min_height), max_height)
         if self._canonical_size is not None:
             initial_w, initial_h = self._canonical_size
-            initial_growth = max(1.0, float(self.config.max_size_growth_from_initial))
+            initial_growth = self._allowed_growth_from_initial(initial_w, initial_h)
             max_initial_width = max(self.config.min_box_size, int(round(initial_w * initial_growth)))
             max_initial_height = max(self.config.min_box_size, int(round(initial_h * initial_growth)))
             stabilized_width = min(stabilized_width, max_initial_width)
             stabilized_height = min(stabilized_height, max_initial_height)
         cx, cy = measured_bbox.center
         return BoundingBox.from_center(cx, cy, stabilized_width, stabilized_height).clamp(frame_shape)
+
+    def _allowed_growth_from_initial(self, initial_width: int, initial_height: int) -> float:
+        """Даёт крупным целям расти, но не позволяет маленькому клику поглотить соседей."""
+
+        configured_growth = max(1.0, float(self.config.max_size_growth_from_initial))
+        initial_max_side = max(initial_width, initial_height)
+        if initial_max_side < 24:
+            return min(configured_growth, 2.0)
+        if initial_max_side < 40:
+            return min(configured_growth, 1.45)
+        if initial_max_side < 70:
+            return min(configured_growth, 1.2)
+        return configured_growth
 
     def _initialize_feature_points(self, frame: ProcessedFrame, bbox: BoundingBox, force: bool = False) -> None:
         """Набирает хорошие точки внутри объекта для локального сопровождения."""

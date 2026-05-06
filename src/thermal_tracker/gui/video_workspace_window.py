@@ -38,6 +38,8 @@ VIDEO_DIALOG_TYPES = [
     ("Все файлы", "*.*"),
 ]
 SHORTCUT_BINDTAG = "ThermalTrackerShortcuts"
+GUI_STATE_CONFIG_PATH = Path(__file__).with_name("gui_state.json")
+GUI_STATE_VERSION = 1
 
 
 class TrackingPlayerWindow:
@@ -54,7 +56,9 @@ class TrackingPlayerWindow:
         self.session: TrackingSession | None = None
         self.root = tk.Tk()
         self.root.title("Тепловизионный трекер")
+        self._gui_state = self._load_gui_state()
         self.root.geometry("1720x980")
+        self._apply_saved_window_geometry()
         self.root.minsize(1320, 820)
 
         self._closed = False
@@ -76,19 +80,21 @@ class TrackingPlayerWindow:
         self._preset_name_to_display = self._build_preset_display_map()
         self._preset_display_to_name = {display: name for name, display in self._preset_name_to_display.items()}
         default_preset_name = default_preset if default_preset in AVAILABLE_PRESETS else AVAILABLE_PRESETS[0]
+        saved_preset_name = self._saved_preset_name(default_preset_name)
+        saved_source_kind = self._saved_source_kind()
 
         self._directory_var = tk.StringVar()
-        self._source_kind_var = tk.StringVar(value=SOURCE_KIND_LABELS["video_directory"])
-        self._preset_var = tk.StringVar(value=self._preset_name_to_display[default_preset_name])
-        self._delay_var = tk.StringVar(value=str(default_delay_ms))
-        self._record_video_var = tk.BooleanVar(value=False)
+        self._source_kind_var = tk.StringVar(value=SOURCE_KIND_LABELS[saved_source_kind])
+        self._preset_var = tk.StringVar(value=self._preset_name_to_display[saved_preset_name])
+        self._delay_var = tk.StringVar(value=str(self._saved_delay_ms(default_delay_ms)))
+        self._record_video_var = tk.BooleanVar(value=self._saved_bool("record_video", False))
         self._preset_summary_var = tk.StringVar()
         self._playlist_status_var = tk.StringVar(value="Источник пока не выбран.")
-        self._model_var = tk.StringVar()
-        self._tracker_var = tk.StringVar()
+        self._model_var = tk.StringVar(value=self._saved_string("model_path"))
+        self._tracker_var = tk.StringVar(value=self._saved_string("tracker_config_path"))
         self._timeline_var = tk.DoubleVar(value=0.0)
         self._time_label_var = tk.StringVar(value="00:00 / 00:00")
-        self._speed_factor_var = tk.StringVar(value="1.0")
+        self._speed_factor_var = tk.StringVar(value=self._saved_speed_factor())
 
         self._video_files: list[Path] = []
         self._selected_video_path: Path | None = None
@@ -151,15 +157,189 @@ class TrackingPlayerWindow:
 
         return self._preset_display_to_name.get(self._preset_var.get(), AVAILABLE_PRESETS[0])
 
+    @staticmethod
+    def _load_gui_state() -> dict[str, object]:
+        """Читает сохранённые настройки окна из локального JSON."""
+
+        if not GUI_STATE_CONFIG_PATH.exists():
+            return {}
+        try:
+            loaded = json.loads(GUI_STATE_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return loaded if isinstance(loaded, dict) else {}
+
+    def _saved_string(self, key: str, default: str = "") -> str:
+        """Безопасно достаёт строковое значение из сохранённого состояния."""
+
+        value = self._gui_state.get(key)
+        return value if isinstance(value, str) else default
+
+    def _saved_bool(self, key: str, default: bool) -> bool:
+        """Безопасно достаёт булево значение из сохранённого состояния."""
+
+        value = self._gui_state.get(key)
+        return value if isinstance(value, bool) else default
+
+    def _saved_preset_name(self, default_preset_name: str) -> str:
+        """Возвращает сохранённый пресет, если он ещё существует."""
+
+        preset_name = self._saved_string("preset_name")
+        return preset_name if preset_name in AVAILABLE_PRESETS else default_preset_name
+
+    def _saved_source_kind(self) -> str:
+        """Возвращает сохранённый тип источника, если он поддерживается текущим GUI."""
+
+        source_kind = self._saved_string("source_kind", "video_directory")
+        return source_kind if source_kind in SOURCE_KIND_LABELS else "video_directory"
+
+    def _saved_delay_ms(self, default_delay_ms: int) -> int:
+        """Возвращает сохранённую задержку кадров с защитой от мусора в JSON."""
+
+        value = self._gui_state.get("delay_ms")
+        if isinstance(value, int) and value >= 1:
+            return value
+        return default_delay_ms
+
+    def _saved_speed_factor(self) -> str:
+        """Возвращает сохранённую скорость в формате поля ввода."""
+
+        value = self._gui_state.get("speed_factor")
+        if not isinstance(value, (int, float)):
+            return "1.0"
+        clamped = self._clamp_speed_factor(float(value))
+        return f"{clamped:.2f}".rstrip("0").rstrip(".")
+
+    def _apply_saved_window_geometry(self) -> None:
+        """Восстанавливает размер и положение окна, если Tk принимает сохранённое значение."""
+
+        geometry = self._saved_string("window_geometry")
+        if geometry:
+            try:
+                self.root.geometry(geometry)
+            except tk.TclError:
+                pass
+
+        window_state = self._saved_string("window_state")
+        if window_state == "zoomed":
+            self.root.after_idle(lambda: self.root.state("zoomed"))
+
     def _finish_startup(self, default_video: str, auto_start: bool) -> None:
         """Догружает плейлист и превью уже после появления окна."""
 
         if self._closed:
             return
-        self._load_initial_directory(default_video)
+        restored = False if default_video else self._restore_saved_source()
+        if not restored:
+            self._load_initial_directory(default_video)
         self._refresh_view()
         if auto_start and self._selected_video_path is not None:
             self._open_selected_video()
+
+    def _restore_saved_source(self) -> bool:
+        """Восстанавливает источник и выбранный ролик из состояния окна."""
+
+        source_kind = self._saved_source_kind()
+        self._source_kind_var.set(SOURCE_KIND_LABELS[source_kind])
+
+        if source_kind == "shared_memory":
+            self._on_source_kind_changed()
+            return True
+
+        selected_video = self._saved_path("selected_video_path")
+        if source_kind == "video_files":
+            files = self._saved_video_files()
+            if not files:
+                return False
+            self._load_video_files(files, select_path=selected_video)
+            return bool(self._video_files)
+
+        source_path = self._saved_path("source_path")
+        if source_path is None and selected_video is not None:
+            source_path = selected_video.parent
+        if source_path is None or not source_path.exists() or not source_path.is_dir():
+            return False
+        self._load_video_directory(source_path, select_path=selected_video)
+        return bool(self._video_files)
+
+    def _saved_path(self, key: str) -> Path | None:
+        """Достаёт путь из состояния и отбрасывает пустые значения."""
+
+        value = self._gui_state.get(key)
+        if not isinstance(value, str) or not value.strip():
+            return None
+        return Path(value).expanduser()
+
+    def _saved_video_files(self) -> list[Path]:
+        """Возвращает существующие файлы сохранённого плейлиста."""
+
+        raw_files = self._gui_state.get("video_files")
+        if not isinstance(raw_files, list):
+            return []
+
+        files: list[Path] = []
+        for raw_path in raw_files:
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                continue
+            path = Path(raw_path).expanduser()
+            if path.exists() and path.suffix.lower() in VIDEO_SUFFIXES:
+                files.append(path)
+        return files
+
+    def _current_gui_state(self) -> dict[str, object]:
+        """Собирает настройки окна, которые стоит восстановить при следующем запуске."""
+
+        source_kind = self._selected_source_kind()
+        selected_video_path = str(self._selected_video_path) if self._selected_video_path is not None else ""
+        source_path = self._directory_var.get().strip()
+        if source_kind == "video_directory" and self._selected_video_path is not None:
+            source_path = str(self._selected_video_path.parent)
+        if source_kind == "shared_memory":
+            source_path = ""
+
+        window_state = "normal"
+        try:
+            current_state = self.root.state()
+            if current_state in {"normal", "zoomed"}:
+                window_state = current_state
+        except tk.TclError:
+            pass
+
+        return {
+            "version": GUI_STATE_VERSION,
+            "source_kind": source_kind,
+            "source_path": source_path,
+            "video_files": [str(path) for path in self._video_files] if source_kind == "video_files" else [],
+            "selected_video_path": selected_video_path,
+            "preset_name": self._selected_preset_name(),
+            "delay_ms": self._current_delay_ms(),
+            "speed_factor": self._get_speed_factor(),
+            "record_video": bool(self._record_video_var.get()),
+            "model_path": self._model_var.get().strip(),
+            "tracker_config_path": self._tracker_var.get().strip(),
+            "window_geometry": self.root.winfo_geometry(),
+            "window_state": window_state,
+        }
+
+    def _current_delay_ms(self) -> int:
+        """Возвращает текущую задержку кадров без показа диалогов об ошибке."""
+
+        try:
+            delay_ms = int(self._delay_var.get().strip())
+        except ValueError:
+            return 30
+        return max(1, delay_ms)
+
+    def _save_gui_state(self) -> None:
+        """Записывает настройки окна рядом с GUI-кодом."""
+
+        try:
+            GUI_STATE_CONFIG_PATH.write_text(
+                json.dumps(self._current_gui_state(), ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
 
     @staticmethod
     def _scan_relative_files(directory: Path, suffixes: set[str]) -> list[str]:
@@ -1520,6 +1700,7 @@ class TrackingPlayerWindow:
         if self._closed:
             return "break"
         self._closed = True
+        self._save_gui_state()
         self._close_session_only()
         self.root.destroy()
         return "break"

@@ -146,7 +146,7 @@ def render_frame(
 
     if snapshot.bbox is not None:
         label = f"#{snapshot.track_id}" if snapshot.track_id is not None else ""
-        _draw_box(canvas, snapshot.bbox, (0, 255, 0), thickness, label, font_scale=0.5, text_thickness=1)
+        _draw_box(canvas, snapshot.bbox, (0, 255, 0), thickness, label, font_scale=0.38, text_thickness=1)
 
     if pending_click is not None:
         cv2.circle(canvas, pending_click, 6, (0, 0, 255), -1)

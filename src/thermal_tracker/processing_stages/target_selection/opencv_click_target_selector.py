@@ -56,6 +56,9 @@ class ClickTargetSelector(BaseClickInitializer):
             patch = self._extract_patch(frame.normalized, point, expected_bbox, radius)
             if expected_bbox is None:
                 patch = self._snap_patch_point(patch)
+                contrast_selection = self._select_contrast_component(patch, frame.bgr.shape)
+                if contrast_selection is not None:
+                    return contrast_selection
             mask, polarity = self._build_mask(patch.image, patch.local_x, patch.local_y)
             component_bbox, confidence = self._extract_component(mask, patch, expected_bbox)
             if component_bbox is None and expected_bbox is None:
@@ -124,10 +127,22 @@ class ClickTargetSelector(BaseClickInitializer):
             return patch
 
         blurred = cv2.GaussianBlur(window, (5, 5), 0)
+        clicked_value = float(patch.image[patch.local_y, patch.local_x])
         local_median = float(np.median(blurred))
+        if abs(clicked_value - local_median) >= self.config.min_object_contrast:
+            return patch
+
         yy, xx = np.indices(blurred.shape)
         distance = np.sqrt((xx - (patch.local_x - x1)) ** 2 + (yy - (patch.local_y - y1)) ** 2)
-        deviation = np.abs(blurred.astype(np.float32) - local_median)
+        raw_deviation = blurred.astype(np.float32) - local_median
+        clicked_deviation = clicked_value - local_median
+        if abs(clicked_deviation) >= self.config.min_object_contrast:
+            if clicked_deviation >= 0:
+                deviation = np.maximum(raw_deviation, 0.0)
+            else:
+                deviation = np.maximum(-raw_deviation, 0.0)
+        else:
+            deviation = np.abs(raw_deviation)
         score = deviation - distance * 1.6
 
         best_y, best_x = np.unravel_index(int(np.argmax(score)), score.shape)
@@ -152,6 +167,8 @@ class ClickTargetSelector(BaseClickInitializer):
             height=selection.bbox.height,
         ).clamp(patch.image.shape)
         if local_seed.area <= 0:
+            return selection
+        if local_seed.area > 3000:
             return selection
 
         margin = max(
@@ -215,25 +232,222 @@ class ClickTargetSelector(BaseClickInitializer):
             return selection
         if area > int(work_patch.shape[0] * work_patch.shape[1] * self.config.max_expanded_fill):
             return selection
-        if area > int(selection.bbox.area * self.config.max_expansion_ratio):
+        allowed_expansion_ratio = self._allowed_expansion_ratio(selection.bbox.area)
+        if area > int(selection.bbox.area * allowed_expansion_ratio):
             return selection
 
         x = int(stats[best_label, cv2.CC_STAT_LEFT])
         y = int(stats[best_label, cv2.CC_STAT_TOP])
         w = int(stats[best_label, cv2.CC_STAT_WIDTH])
         h = int(stats[best_label, cv2.CC_STAT_HEIGHT])
+        expanded_width = w + self.config.padding * 2
+        expanded_height = h + self.config.padding * 2
+        allowed_side_ratio = self._allowed_expansion_side_ratio(selection.bbox.area)
+        if expanded_width > int(selection.bbox.width * allowed_side_ratio):
+            return selection
+        if expanded_height > int(selection.bbox.height * allowed_side_ratio):
+            return selection
 
         expanded_bbox = BoundingBox(
             x=patch.origin_x + work_bbox.x + x - self.config.padding,
             y=patch.origin_y + work_bbox.y + y - self.config.padding,
-            width=w + self.config.padding * 2,
-            height=h + self.config.padding * 2,
+            width=expanded_width,
+            height=expanded_height,
         )
         return SelectionResult(
             bbox=expanded_bbox,
             confidence=max(selection.confidence, min(1.0, area / max(self.config.min_component_area, 1))),
             polarity=selection.polarity,
         )
+
+    def _select_contrast_component(
+        self,
+        patch: _LocalPatch,
+        frame_shape: tuple[int, int] | tuple[int, int, int],
+    ) -> SelectionResult | None:
+        """Выбирает цель как отдельный контрастный компонент вокруг клика."""
+
+        clicked_value = int(patch.image[patch.local_y, patch.local_x])
+        patch_median = float(np.median(patch.image))
+        hot_object = clicked_value >= patch_median
+        polarity = "hot" if hot_object else "cold"
+
+        blurred = cv2.GaussianBlur(patch.image, (5, 5), 0)
+        threshold_mode = cv2.THRESH_BINARY if hot_object else cv2.THRESH_BINARY_INV
+        _, object_mask = cv2.threshold(blurred, 0, 255, threshold_mode + cv2.THRESH_OTSU)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        object_mask = cv2.morphologyEx(object_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        object_mask = cv2.morphologyEx(object_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
+
+        bbox, area = self._component_bbox_for_click(object_mask, patch.local_x, patch.local_y)
+        if bbox is None:
+            return None
+
+        split_bbox, split_area = self._split_contrast_cluster(
+            blurred,
+            object_mask,
+            bbox,
+            patch.local_x,
+            patch.local_y,
+            hot_object,
+        )
+        if split_bbox is not None:
+            bbox = split_bbox
+            area = split_area
+
+        patch_area = patch.image.shape[0] * patch.image.shape[1]
+        if area > int(patch_area * self.config.max_component_fill):
+            return None
+        if self._touches_local_patch_border(bbox, patch.image.shape):
+            return None
+
+        max_patch_width = int(patch.image.shape[1] * self.config.max_patch_span_ratio)
+        max_patch_height = int(patch.image.shape[0] * self.config.max_patch_span_ratio)
+        if bbox.width > max_patch_width or bbox.height > max_patch_height:
+            return None
+
+        component_mask = object_mask[bbox.y:bbox.y2, bbox.x:bbox.x2] > 0
+        object_values = patch.image[bbox.y:bbox.y2, bbox.x:bbox.x2][component_mask]
+        if object_values.size == 0:
+            return None
+
+        background_bbox = bbox.pad(self.config.background_ring, self.config.background_ring).clamp(patch.image.shape)
+        background_mask = np.ones(
+            (background_bbox.height, background_bbox.width),
+            dtype=bool,
+        )
+        inner_x1 = bbox.x - background_bbox.x
+        inner_y1 = bbox.y - background_bbox.y
+        background_mask[
+            inner_y1:inner_y1 + bbox.height,
+            inner_x1:inner_x1 + bbox.width,
+        ] = False
+        background_values = patch.image[
+            background_bbox.y:background_bbox.y2,
+            background_bbox.x:background_bbox.x2,
+        ][background_mask]
+        if background_values.size < 10:
+            return None
+
+        object_level = float(np.median(object_values))
+        background_level = float(np.median(background_values))
+        contrast = object_level - background_level if hot_object else background_level - object_level
+        if contrast < self.config.min_object_contrast:
+            return None
+
+        result_bbox = BoundingBox(
+            x=patch.origin_x + bbox.x - self.config.padding,
+            y=patch.origin_y + bbox.y - self.config.padding,
+            width=bbox.width + self.config.padding * 2,
+            height=bbox.height + self.config.padding * 2,
+        ).clamp(frame_shape)
+        confidence = max(0.1, min(1.0, area / max(self.config.min_component_area, 1)))
+        return SelectionResult(bbox=result_bbox, confidence=confidence, polarity=polarity)
+
+    def _split_contrast_cluster(
+        self,
+        blurred_patch: np.ndarray,
+        object_mask: np.ndarray,
+        bbox: BoundingBox,
+        click_x: int,
+        click_y: int,
+        hot_object: bool,
+    ) -> tuple[BoundingBox | None, int]:
+        """Разделяет крупный контрастный кластер на отдельные яркие ядра."""
+
+        patch_area = object_mask.shape[0] * object_mask.shape[1]
+        bbox_area = bbox.area
+        if patch_area <= 0 or bbox_area <= 0:
+            return None, 0
+        if bbox_area < 1800 and max(bbox.width, bbox.height) < 55:
+            return None, 0
+        if bbox_area > patch_area * 0.25:
+            return None, 0
+
+        _, labels, _, _ = cv2.connectedComponentsWithStats(object_mask)
+        clicked_label = int(labels[click_y, click_x])
+        if clicked_label == 0:
+            clicked_label = self._nearest_label(labels, click_x, click_y)
+        if clicked_label == 0:
+            return None, 0
+
+        component_mask = labels == clicked_label
+        component_values = blurred_patch[component_mask]
+        if component_values.size < self.config.min_component_area * 4:
+            return None, 0
+
+        for quantile in (0.55, 0.65, 0.75):
+            threshold = float(np.quantile(component_values, quantile if hot_object else 1.0 - quantile))
+            if hot_object:
+                core_mask = np.logical_and(component_mask, blurred_patch >= threshold)
+            else:
+                core_mask = np.logical_and(component_mask, blurred_patch <= threshold)
+
+            core_mask_u8 = core_mask.astype(np.uint8) * 255
+            _, core_labels, core_stats, core_centroids = cv2.connectedComponentsWithStats(core_mask_u8)
+            candidates: list[tuple[int, float, int, int, BoundingBox]] = []
+            for label in range(1, core_stats.shape[0]):
+                area = int(core_stats[label, cv2.CC_STAT_AREA])
+                if area < max(6, self.config.min_component_area // 2):
+                    continue
+                x = int(core_stats[label, cv2.CC_STAT_LEFT])
+                y = int(core_stats[label, cv2.CC_STAT_TOP])
+                w = int(core_stats[label, cv2.CC_STAT_WIDTH])
+                h = int(core_stats[label, cv2.CC_STAT_HEIGHT])
+                core_bbox = BoundingBox(x, y, w, h)
+                contains_click = 0 if core_labels[click_y, click_x] == label else 1
+                cx, cy = core_centroids[label]
+                distance = float((cx - click_x) ** 2 + (cy - click_y) ** 2)
+                candidates.append((contains_click, distance, -area, label, core_bbox))
+
+            if len(candidates) < 2:
+                continue
+
+            _, _, _, selected_label, selected_core = min(candidates)
+            selected_mask = (core_labels == selected_label).astype(np.uint8) * 255
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            selected_mask = cv2.dilate(selected_mask, kernel, iterations=1)
+            selected_mask = np.logical_and(selected_mask > 0, component_mask)
+            points = np.column_stack(np.where(selected_mask))
+            if points.size == 0:
+                continue
+
+            left = int(np.min(points[:, 1]))
+            top = int(np.min(points[:, 0]))
+            right = int(np.max(points[:, 1])) + 1
+            bottom = int(np.max(points[:, 0])) + 1
+            split_bbox = BoundingBox(left, top, right - left, bottom - top)
+            split_area = int(np.count_nonzero(selected_mask))
+            if split_bbox.area >= bbox_area * 0.78:
+                continue
+            return split_bbox, split_area
+
+        return None, 0
+
+    def _allowed_expansion_ratio(self, seed_area: int) -> float:
+        """Ограничивает разрастание маленького ядра, но не душит крупные контрастные цели."""
+
+        configured_ratio = float(self.config.max_expansion_ratio)
+        if seed_area < 300:
+            return min(configured_ratio, 3.0)
+        if seed_area < 900:
+            return min(configured_ratio, 3.2)
+        if seed_area < 1600:
+            return min(configured_ratio, 4.2)
+        return configured_ratio
+
+    def _allowed_expansion_side_ratio(self, seed_area: int) -> float:
+        """Сдерживает расширение, когда рядом есть похожие отдельные объекты."""
+
+        if seed_area < 300:
+            return 1.8
+        if seed_area < 900:
+            return 1.95
+        if seed_area < 1600:
+            return 2.3
+        return 3.0
 
     def _extract_patch(
         self,
@@ -269,9 +483,22 @@ class ClickTargetSelector(BaseClickInitializer):
     def _build_mask(self, patch: np.ndarray, click_x: int, click_y: int) -> tuple[np.ndarray, str]:
         """Строит стартовую маску вокруг кликнутого пикселя."""
 
+        return self._build_mask_with_tolerance_scale(patch, click_x, click_y, tolerance_scale=1.0)
+
+    def _build_mask_with_tolerance_scale(
+        self,
+        patch: np.ndarray,
+        click_x: int,
+        click_y: int,
+        *,
+        tolerance_scale: float,
+    ) -> tuple[np.ndarray, str]:
+        """Строит маску с возможностью ужать допуск по яркости для крупной компоненты."""
+
         clicked_value = int(patch[click_y, click_x])
         median_value = float(np.median(patch))
         tolerance = self._estimate_tolerance(patch, click_x, click_y)
+        tolerance = max(self.config.min_tolerance, int(round(tolerance * tolerance_scale)))
 
         patch_int = patch.astype(np.int16)
         similarity_mask = np.abs(patch_int - clicked_value) <= tolerance
@@ -347,9 +574,18 @@ class ClickTargetSelector(BaseClickInitializer):
         h = int(stats[clicked_label, cv2.CC_STAT_HEIGHT])
 
         if expected_bbox is None:
-            split_bbox = self._split_large_component(mask, labels, clicked_label, patch.local_x, patch.local_y)
-            if split_bbox is not None:
-                x, y, w, h = split_bbox.to_xywh()
+            tight_bbox, tight_area = self._tighten_large_component(
+                patch,
+                original_bbox=BoundingBox(x, y, w, h),
+                original_area=area,
+            )
+            if tight_bbox is not None:
+                x, y, w, h = tight_bbox.to_xywh()
+                area = tight_area
+            else:
+                split_bbox = self._split_large_component(mask, labels, clicked_label, patch.local_x, patch.local_y)
+                if split_bbox is not None:
+                    x, y, w, h = split_bbox.to_xywh()
 
         max_patch_width = int(mask.shape[1] * self.config.max_patch_span_ratio)
         max_patch_height = int(mask.shape[0] * self.config.max_patch_span_ratio)
@@ -389,7 +625,7 @@ class ClickTargetSelector(BaseClickInitializer):
 
         best_bbox: BoundingBox | None = None
         best_area = original_area
-        kernels = ((3, 3), (5, 5))
+        kernels = ((3, 3), (5, 5), (7, 7), (9, 9), (11, 11))
 
         for kernel_size in kernels:
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_size)
@@ -435,11 +671,78 @@ class ClickTargetSelector(BaseClickInitializer):
                 continue
 
             _, bbox, area = best_candidate
+            if area < original_area * 0.08:
+                continue
             if area < best_area * 0.88:
                 best_bbox = bbox
                 best_area = area
 
         return best_bbox
+
+    def _tighten_large_component(
+        self,
+        patch: _LocalPatch,
+        original_bbox: BoundingBox,
+        original_area: int,
+    ) -> tuple[BoundingBox | None, int]:
+        """Повторно выделяет слишком большую стартовую компоненту с более строгим порогом."""
+
+        patch_area = patch.image.shape[0] * patch.image.shape[1]
+        if patch_area <= 0:
+            return None, 0
+
+        area_fill = original_area / patch_area
+        span_ratio = max(
+            original_bbox.width / max(patch.image.shape[1], 1),
+            original_bbox.height / max(patch.image.shape[0], 1),
+        )
+        if area_fill < 0.16 and span_ratio < 0.62:
+            return None, 0
+
+        original_bbox_area = max(original_bbox.area, 1)
+        best_bbox: BoundingBox | None = None
+        best_area = 0
+        for tolerance_scale in (0.55, 0.4, 0.3):
+            mask, _ = self._build_mask_with_tolerance_scale(
+                patch.image,
+                patch.local_x,
+                patch.local_y,
+                tolerance_scale=tolerance_scale,
+            )
+            bbox, area = self._component_bbox_for_click(mask, patch.local_x, patch.local_y)
+            if bbox is None:
+                continue
+            if area < self.config.min_component_area * 3:
+                continue
+            if bbox.area > original_bbox_area * 0.78:
+                continue
+            best_bbox = bbox
+            best_area = area
+            break
+
+        return best_bbox, best_area
+
+    def _component_bbox_for_click(self, mask: np.ndarray, click_x: int, click_y: int) -> tuple[BoundingBox | None, int]:
+        """Возвращает локальный bbox компоненты, ближайшей к клику."""
+
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+        clicked_label = int(labels[click_y, click_x])
+        if clicked_label == 0:
+            clicked_label = self._nearest_label(labels, click_x, click_y)
+            if clicked_label == 0:
+                return None, 0
+
+        area = int(stats[clicked_label, cv2.CC_STAT_AREA])
+        if area < self.config.min_component_area:
+            return None, 0
+
+        bbox = BoundingBox(
+            x=int(stats[clicked_label, cv2.CC_STAT_LEFT]),
+            y=int(stats[clicked_label, cv2.CC_STAT_TOP]),
+            width=int(stats[clicked_label, cv2.CC_STAT_WIDTH]),
+            height=int(stats[clicked_label, cv2.CC_STAT_HEIGHT]),
+        )
+        return bbox, area
 
     def _build_attempt_radii(self, expected_bbox: BoundingBox | None) -> list[int]:
         """Готовит радиусы патча для одной или двух попыток выбора."""
@@ -478,6 +781,22 @@ class ClickTargetSelector(BaseClickInitializer):
         tolerance = max(self.config.min_tolerance, tolerance)
         tolerance = min(self.config.max_tolerance, tolerance)
         return tolerance
+
+    @staticmethod
+    def _touches_local_patch_border(
+        bbox: BoundingBox,
+        patch_shape: tuple[int, int] | tuple[int, int, int],
+        tolerance: int = 2,
+    ) -> bool:
+        """Проверяет локальный bbox на касание края патча."""
+
+        patch_h, patch_w = patch_shape[:2]
+        return (
+            bbox.x <= tolerance
+            or bbox.y <= tolerance
+            or bbox.x2 >= patch_w - tolerance
+            or bbox.y2 >= patch_h - tolerance
+        )
 
     @staticmethod
     def _touches_patch_border(bbox: BoundingBox, patch: _LocalPatch, tolerance: int = 2) -> bool:
