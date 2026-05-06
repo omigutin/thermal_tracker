@@ -23,16 +23,24 @@ class FrameConnectionConfig:
     reader: str = "opencv_video"
     source_path: str = "video"
     camera_count: int = 1
+    camera_id: int = 0
+    shared_memory_prefix: str = "thermal_tracker"
+    frame_width: int = 512
+    frame_height: int = 640
+    frame_channels: int = 1
+    frame_format: str = "raw_y8"
 
 
 @dataclass(frozen=True)
 class CommandConnectionConfig:
     reader: str = "gui"
+    shared_memory_prefix: str = "thermal_tracker"
 
 
 @dataclass(frozen=True)
 class ResultConnectionConfig:
     writer: str = "gui"
+    shared_memory_prefix: str = "thermal_tracker"
 
 
 @dataclass(frozen=True)

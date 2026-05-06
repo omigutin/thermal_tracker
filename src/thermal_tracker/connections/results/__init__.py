@@ -12,7 +12,7 @@ def create_result_writer(config):
     if writer == "gui":
         return GuiResultWriter()
     if writer == "shared_memory":
-        return SharedMemoryResultWriter()
+        return SharedMemoryResultWriter(prefix=getattr(config, "shared_memory_prefix", "thermal_tracker"))
     if writer == "file":
         return FileResultWriter()
     if writer in {"", "log", "null", "none"}:

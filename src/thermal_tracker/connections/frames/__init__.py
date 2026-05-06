@@ -29,7 +29,15 @@ def create_frame_reader(config):
     if reader == "rtsp_stream":
         return RtspStreamFrameSource(source_path)
     if reader == "shared_memory":
-        return SharedMemoryFrameReader(getattr(config, "camera_count", 1))
+        return SharedMemoryFrameReader(
+            getattr(config, "camera_count", 1),
+            prefix=getattr(config, "shared_memory_prefix", "thermal_tracker"),
+            camera_id=getattr(config, "camera_id", 0),
+            width=getattr(config, "frame_width", 512),
+            height=getattr(config, "frame_height", 640),
+            channels=getattr(config, "frame_channels", 1),
+            frame_format=getattr(config, "frame_format", "raw_y8"),
+        )
     if reader == "multi_camera":
         return MultiCameraFrameSource([])
     raise ValueError(f"Unknown frame reader: {reader!r}")

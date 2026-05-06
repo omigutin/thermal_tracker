@@ -1,10 +1,11 @@
 [app]
 mode = "runtime"
-scenario = "nn_manual"
+scenario = "opencv_manual"
+preset = "opencv_general"
 
 [connections.frames]
 reader = "shared_memory"
-camera_count = 4
+camera_count = 1
 camera_id = 0
 shared_memory_prefix = "thermal_tracker"
 frame_width = 512
@@ -24,11 +25,11 @@ shared_memory_prefix = "thermal_tracker"
 enabled = false
 
 [model]
-type = "yolo"
-model_path = "models/model.pt"
+type = "none"
+model_path = ""
 
 [tracker]
-config_path = "trackers/botsort.yaml"
+config_path = ""
 
 [history]
 enabled = false

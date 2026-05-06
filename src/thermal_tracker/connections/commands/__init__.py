@@ -11,7 +11,7 @@ def create_command_reader(config):
     if reader == "gui":
         return GuiCommandReader()
     if reader == "shared_memory":
-        return SharedMemoryCommandReader()
+        return SharedMemoryCommandReader(prefix=getattr(config, "shared_memory_prefix", "thermal_tracker"))
     if reader in {"", "null", "none"}:
         return NullCommandReader()
     raise ValueError(f"Unknown command reader: {reader!r}")
