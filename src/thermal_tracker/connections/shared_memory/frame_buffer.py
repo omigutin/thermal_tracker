@@ -95,9 +95,10 @@ class SharedMemoryFrameBuffer:
         self.max_payload_size = self.width * self.height * self.channels
         self.meta_name = frame_buffer_name(prefix, self.camera_id, "frame_meta")
         self.data_name = frame_buffer_name(prefix, self.camera_id, "frame_data")
+        self._created_any_segment = False
         self._meta = self._open_segment(self.meta_name, _FRAME_HEADER.size, create, create_if_missing)
         self._data = self._open_segment(self.data_name, self.max_payload_size, create, create_if_missing)
-        if create or create_if_missing:
+        if create or self._created_any_segment:
             self._write_empty_header()
 
     @classmethod
@@ -127,8 +128,8 @@ class SharedMemoryFrameBuffer:
         except FileNotFoundError:
             return None
 
-    @staticmethod
     def _open_segment(
+        self,
         name: str,
         size: int,
         create: bool,
@@ -137,13 +138,17 @@ class SharedMemoryFrameBuffer:
         """Открывает или создаёт один сегмент Shared Memory."""
 
         try:
-            return shared_memory.SharedMemory(name=name, create=create, size=size)
+            segment = shared_memory.SharedMemory(name=name, create=create, size=size)
+            if create:
+                self._created_any_segment = True
+            return segment
         except FileExistsError:
             return shared_memory.SharedMemory(name=name, create=False)
         except FileNotFoundError:
             if not create_if_missing:
                 raise
             segment = shared_memory.SharedMemory(name=name, create=True, size=size)
+            self._created_any_segment = True
             return segment
 
     def write_frame(

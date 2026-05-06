@@ -27,6 +27,8 @@ packages = [
 numpy = "==2.4.2"
 opencv-python = "==4.13.0.92"
 ultralytics = "==8.4.43"
+fastapi = "^0.115"
+uvicorn = "^0.32"
 
 
 # =========================
