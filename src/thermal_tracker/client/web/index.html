@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thermal Tracker Gateway</title>
+  <link rel="stylesheet" href="/web/styles.css">
+</head>
+<body>
+  <main>
+    <div id="empty">Кадров пока нет. Запустите отправитель видео в gateway.</div>
+    <img id="frame" alt="Последний кадр" hidden>
+  </main>
+  <aside>
+    <button id="reset" type="button">Сбросить трек</button>
+    <section id="summary"></section>
+    <pre id="metrics">Ожидание кадров...</pre>
+  </aside>
+  <script src="/web/app.js"></script>
+</body>
+</html>

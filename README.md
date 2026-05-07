@@ -2,19 +2,45 @@
 
 Python-проект для сопровождения объектов на тепловизионном видео.
 
-Код организован вокруг пакета `thermal_tracker`: сценарии отдельно, стадии обработки отдельно, GUI отдельно, внешние подключения отдельно. GUI не является центром архитектуры, а остаётся dev-стендом для проверки и настройки.
+Код разделён на три пакета:
+
+- `thermal_tracker_core` — алгоритмы, сценарии, конфиги, доменные модели, `connections` и `storage`;
+- `thermal_tracker_server` — headless runtime, HTTP gateway и worker-процессы вокруг Shared Memory;
+- `thermal_tracker_client` — desktop GUI, web-клиент и локальные отправители кадров.
+
+Старый пакет `thermal_tracker` оставлен как compatibility-слой для старых импортов. Новый код лучше импортировать через `thermal_tracker_core`, `thermal_tracker_server` и `thermal_tracker_client`.
 
 ## Запуск
 
-```bash
-python run_dev.py
-python run_runtime.py
+В корне оставлены только пользовательские входы:
+
+```powershell
+poetry run python run_server.py
+poetry run python run_desktop_client.py
+poetry run python run_web_client.py
+```
+
+Что они делают:
+
+- `run_server.py` по умолчанию запускает серверный стек: HTTP gateway + runtime worker.
+- `run_desktop_client.py` запускает desktop GUI для настройки и проверки пресетов.
+- `run_web_client.py` открывает браузерный клиент уже запущенного gateway.
+
+Технические режимы не исчезли, но убраны из корня:
+
+```powershell
+poetry run python run_server.py gateway
+poetry run python run_server.py runtime
+poetry run python run_server.py cleanup
+poetry run python -m thermal_tracker_client.services.network_video_sender "W:\path\to\video.mp4"
+poetry run python -m thermal_tracker_client.services.synthetic_network_sender
 ```
 
 По умолчанию:
 
-- `run_dev.py` читает `configs/dev.toml`;
-- `run_runtime.py` читает `configs/runtime.toml`;
+- `run_server.py` читает `configs/runtime.toml`;
+- `run_desktop_client.py` читает `configs/dev.toml`;
+- runtime/dev-конфиги лежат в `configs/`;
 - алгоритмические пресеты лежат в `presets/`;
 - модели лежат в `models/`;
 - конфиги внешних трекеров лежат в `trackers/`.
@@ -31,14 +57,17 @@ python run_runtime.py
 
 ## Структура
 
-- `src/thermal_tracker/domain` — модели данных и контракты.
-- `src/thermal_tracker/scenarios` — сборки режимов работы.
-- `src/thermal_tracker/processing_stages` — алгоритмические стадии.
-- `src/thermal_tracker/connections` — frames/commands/results.
-- `src/thermal_tracker/nnet_interface` — временный интерфейс к NN-моделям.
-- `src/thermal_tracker/gui` — dev GUI.
-- `src/thermal_tracker/config` — загрузка TOML-конфигов и пресетов.
-- `src/thermal_tracker/storage` — интерфейсы и заготовки хранилища истории.
+- `src/thermal_tracker_core/domain` — модели данных и контракты.
+- `src/thermal_tracker_core/scenarios` — сборки режимов работы.
+- `src/thermal_tracker_core/processing_stages` — алгоритмические стадии.
+- `src/thermal_tracker_core/connections` — frames/commands/results и Shared Memory низкого уровня.
+- `src/thermal_tracker_core/nnet_interface` — временный интерфейс к NN-моделям.
+- `src/thermal_tracker_core/config` — загрузка TOML-конфигов и пресетов.
+- `src/thermal_tracker_core/storage` — интерфейсы и заготовки хранилища истории.
+- `src/thermal_tracker_server` — runtime, gateway и server-side процессы.
+- `src/thermal_tracker_client/gui` — desktop GUI.
+- `src/thermal_tracker_client/web` — статический Web UI gateway.
+- `src/thermal_tracker_client/services` — локальные отправители и стенды.
 
 ## Документация
 

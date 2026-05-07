@@ -1,0 +1,82 @@
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #111;
+  color: #eee;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+}
+
+main {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+img {
+  max-width: 100%;
+  max-height: 100vh;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+#empty {
+  color: #aaa;
+  font-size: 18px;
+  text-align: center;
+  padding: 24px;
+}
+
+aside {
+  border-left: 1px solid #333;
+  padding: 14px;
+  background: #181818;
+  overflow: auto;
+}
+
+button {
+  width: 100%;
+  padding: 9px;
+  margin: 0 0 10px;
+}
+
+.metric {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  border-bottom: 1px solid #2a2a2a;
+  padding: 7px 0;
+}
+
+.metric span:first-child {
+  color: #aaa;
+}
+
+.metric span:last-child {
+  font-weight: 600;
+  text-align: right;
+}
+
+pre {
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr minmax(260px, 42vh);
+  }
+
+  aside {
+    border-left: 0;
+    border-top: 1px solid #333;
+  }
+}

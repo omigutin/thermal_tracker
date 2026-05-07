@@ -1,0 +1,47 @@
+[app]
+mode = "server"
+scenario = "nn_manual"
+
+[server]
+mode = "all"
+host = "0.0.0.0"
+port = 8080
+idle_sleep = 0.001
+max_frames = 0
+init_scenario = false
+report_every = 50
+ingress_log = ""
+metrics_log = ""
+cleanup_before_start = false
+
+[connections.frames]
+reader = "shared_memory"
+camera_count = 4
+camera_id = 0
+shared_memory_prefix = "thermal_tracker"
+frame_width = 512
+frame_height = 640
+frame_channels = 1
+frame_format = "raw_y8"
+
+[connections.commands]
+reader = "shared_memory"
+shared_memory_prefix = "thermal_tracker"
+
+[connections.results]
+writer = "shared_memory"
+shared_memory_prefix = "thermal_tracker"
+
+[gui]
+enabled = false
+
+[model]
+type = "yolo"
+model_path = "models/model.pt"
+
+[tracker]
+config_path = "trackers/botsort.yaml"
+
+[history]
+enabled = false
+store = "null"

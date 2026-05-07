@@ -1,17 +1,17 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import numpy as np
 
-from thermal_tracker.config import load_app_config
-from thermal_tracker.connections.commands.shared_memory_command_reader import SharedMemoryCommandReader
-from thermal_tracker.connections.frames.shared_memory_frame_reader import SharedMemoryFrameReader
-from thermal_tracker.connections.results.shared_memory_result_writer import SharedMemoryResultWriter
-from thermal_tracker.connections.shared_memory import SharedMemoryFrameBuffer, SharedMemoryJsonBuffer
-from thermal_tracker.runtime_app import RuntimeApp
-from thermal_tracker.services.gateway_service import GatewayConfig, SharedMemoryGateway
-from thermal_tracker.services.shared_memory_cleanup import cleanup_shared_memory
-from thermal_tracker.services.synthetic_network_sender import _build_frame
-from thermal_tracker.storage.null_history_store import NullHistoryStore
+from thermal_tracker.core.config import load_app_config
+from thermal_tracker.core.connections.commands.shared_memory_command_reader import SharedMemoryCommandReader
+from thermal_tracker.core.connections.frames.shared_memory_frame_reader import SharedMemoryFrameReader
+from thermal_tracker.core.connections.results.shared_memory_result_writer import SharedMemoryResultWriter
+from thermal_tracker.core.connections.shared_memory import SharedMemoryFrameBuffer, SharedMemoryJsonBuffer
+from thermal_tracker.core.storage.null_history_store import NullHistoryStore
+from thermal_tracker.server.runtime_app import RuntimeApp
+from thermal_tracker.server.services.gateway_service import GatewayConfig, SharedMemoryGateway
+from thermal_tracker.server.services.shared_memory_cleanup import cleanup_shared_memory
+from thermal_tracker.client.services.synthetic_network_sender import _build_frame
 
 
 def test_shared_memory_buffers_roundtrip() -> None:
@@ -64,7 +64,7 @@ def test_gateway_runtime_synthetic_click_roundtrip() -> None:
         gateway.write_command({"type": "click", "x": 41, "y": 297})
 
         app = RuntimeApp(
-            config=load_app_config("configs/shared_memory_smoke.toml"),
+            config=load_app_config("tests/fixtures/server_smoke.toml"),
             scenario_name="opencv_manual",
             scenario=None,
             frame_reader=SharedMemoryFrameReader(prefix=prefix, camera_id=0, width=512, height=640, channels=1),

@@ -4,7 +4,7 @@
 
 ```text
 сетевой источник RAW Y8 -> gateway -> Shared Memory frames
-                                   -> браузер
+                                  -> браузер
 runtime worker <- Shared Memory commands
 runtime worker -> Shared Memory results -> gateway -> браузер
 ```
@@ -19,50 +19,70 @@ runtime worker -> Shared Memory results -> gateway -> браузер
 
 Gateway ставит локальный `timestamp_ns` в момент приёма кадра. Внешний timestamp отправителя сохраняется отдельно как `remote_timestamp_ns`, потому что часы разных устройств нельзя честно сравнивать без синхронизации.
 
-## Полный локальный стенд
+## Основной запуск
+
+Серверная сторона:
+
+```powershell
+poetry run python run_server.py --config configs/shared_memory_smoke.toml
+```
+
+Web-клиент:
+
+```powershell
+poetry run python run_web_client.py
+```
+
+Если браузер нужно открыть с другой машины, используйте адрес gateway:
+
+```powershell
+poetry run python run_web_client.py --server-url http://ORANGE_PI_IP:8080
+```
+
+## Отправка кадров для локального теста
 
 Синтетический источник без видеофайлов:
 
 ```powershell
-poetry run python run_local_bench.py
+poetry run python -m thermal_tracker_client.services.synthetic_network_sender --gateway-url http://127.0.0.1:8080 --fps 25 --width 512 --height 640
 ```
 
-С реальным видео:
+Отправитель реального видео:
 
 ```powershell
-poetry run python run_local_bench.py --video-path "W:\path\to\video.mp4"
+poetry run python -m thermal_tracker_client.services.network_video_sender "W:\path\to\video.mp4" --gateway-url http://127.0.0.1:8080 --fps 25 --width 512 --height 640 --loop
 ```
 
-Открыть:
-
-```text
-http://127.0.0.1:8080
-```
-
-## Ручной запуск по процессам
-
-Gateway:
+Полный локальный bench с sender всё ещё есть, но это технический режим:
 
 ```powershell
-poetry run python run_gateway.py --host 0.0.0.0 --port 8080 --width 512 --height 640
+poetry run python -m thermal_tracker_client.services.local_bench --video-path "W:\path\to\video.mp4"
 ```
 
-Runtime worker:
+## Ручные серверные режимы
+
+Только gateway:
 
 ```powershell
-poetry run python run_shared_memory_worker.py --config configs/shared_memory_smoke.toml --report-every 50
+poetry run python run_server.py gateway --host 0.0.0.0 --port 8080 --width 512 --height 640
 ```
 
-Синтетический отправитель:
+Только runtime worker:
 
 ```powershell
-poetry run python run_synthetic_sender.py --gateway-url http://127.0.0.1:8080 --fps 25 --width 512 --height 640
+poetry run python run_server.py runtime --config configs/shared_memory_smoke.toml --report-every 50
 ```
 
-Отправитель видео:
+Cleanup Shared Memory:
 
 ```powershell
-poetry run python run_network_sender.py "W:\path\to\video.mp4" --gateway-url http://127.0.0.1:8080 --fps 25 --width 512 --height 640 --loop
+poetry run python run_server.py cleanup
+```
+
+Cleanup не запускается автоматически. Если включить его перед стартом сервера, это нужно делать явно:
+
+```powershell
+poetry run python run_server.py --cleanup-before-start
 ```
 
 ## Метрики
@@ -84,25 +104,17 @@ poetry run python run_network_sender.py "W:\path\to\video.mp4" --gateway-url htt
 Лог входящих кадров gateway:
 
 ```powershell
-poetry run python run_gateway.py --ingress-log out\gateway_ingress.jsonl
+poetry run python run_server.py gateway --ingress-log out\gateway_ingress.jsonl
 ```
 
 Лог результатов runtime:
 
 ```powershell
-poetry run python run_shared_memory_worker.py --metrics-log out\runtime_metrics.jsonl
+poetry run python run_server.py runtime --metrics-log out\runtime_metrics.jsonl
 ```
 
-В полном локальном стенде:
+В режиме `all`:
 
 ```powershell
-poetry run python run_local_bench.py --ingress-log out\gateway_ingress.jsonl --metrics-log out\runtime_metrics.jsonl
-```
-
-## Очистка Shared Memory
-
-Если процесс был остановлен аварийно:
-
-```powershell
-poetry run python run_shared_memory_cleanup.py
+poetry run python run_server.py --ingress-log out\gateway_ingress.jsonl --metrics-log out\runtime_metrics.jsonl
 ```

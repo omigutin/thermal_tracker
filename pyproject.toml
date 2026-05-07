@@ -21,6 +21,14 @@ dynamic = ["dependencies"]
 packages = [
     { include = "thermal_tracker", from = "src" },
 ]
+include = [
+    { path = "src/thermal_tracker/client/web/*.html", format = ["sdist", "wheel"] },
+    { path = "src/thermal_tracker/client/web/*.css", format = ["sdist", "wheel"] },
+    { path = "src/thermal_tracker/client/web/*.js", format = ["sdist", "wheel"] },
+    { path = "src/thermal_tracker/client/web/*.toml", format = ["sdist", "wheel"] },
+    { path = "src/thermal_tracker/client/gui/*.toml", format = ["sdist", "wheel"] },
+    { path = "src/thermal_tracker/server/*.toml", format = ["sdist", "wheel"] },
+]
 
 [tool.poetry.dependencies]
 # --- base / prod ---
