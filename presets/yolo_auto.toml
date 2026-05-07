@@ -15,6 +15,7 @@ description = """
 kind = "auto_neural_detection"
 
 [preprocessing]
+method = "identity"
 resize_width = 960
 gaussian_kernel = 1
 median_kernel = 1
@@ -23,6 +24,7 @@ clahe_tile_grid_size = 8
 gradient_blur_kernel = 1
 
 [global_motion]
+method = "opencv_phase_correlation"
 enabled = true
 downscale = 0.5
 blur_kernel = 9
@@ -30,6 +32,7 @@ min_response = 0.03
 max_shift_ratio = 0.35
 
 [click_selection]
+method = "opencv_click"
 search_radius = 100
 similarity_sigma = 1.35
 local_window_radius = 5
@@ -51,6 +54,7 @@ max_expanded_fill = 0.58
 max_expansion_ratio = 5.5
 
 [tracking]
+method = "nn_yolo"
 search_margin = 30
 lost_search_growth = 26
 full_frame_after = 14

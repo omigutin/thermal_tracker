@@ -11,9 +11,6 @@ from .base_candidate_extractor import BaseObjectBuilder
 class ConnectedComponentsObjectBuilder(BaseObjectBuilder):
     """Строит объекты напрямую из компонент связности."""
 
-    implementation_name = "connected_components"
-    is_ready = True
-
     def __init__(self, min_area: int = 24) -> None:
         self.min_area = min_area
 
@@ -36,7 +33,6 @@ class ConnectedComponentsObjectBuilder(BaseObjectBuilder):
                     area=area,
                     confidence=min(1.0, area / max(self.min_area, 1)),
                     label="motion_component",
-                    source=self.implementation_name,
                 )
             )
         return objects

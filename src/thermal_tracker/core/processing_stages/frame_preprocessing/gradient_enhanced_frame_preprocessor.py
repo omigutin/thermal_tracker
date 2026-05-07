@@ -13,8 +13,5 @@ from .base_frame_preprocessor import BaseFramePreprocessor
 class GradientEnhancedPreprocessor(BaseFramePreprocessor):
     """Будущий препроцессор с явным акцентом на контурную структуру."""
 
-    implementation_name = "gradient_enhanced"
-    is_ready = False
-
     def process(self, frame) -> ProcessedFrame:
         raise NotImplementedError("Препроцессор с усилением градиентов пока не реализован.")

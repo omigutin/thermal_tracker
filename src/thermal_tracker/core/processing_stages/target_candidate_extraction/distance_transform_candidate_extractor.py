@@ -8,8 +8,5 @@ from .base_candidate_extractor import BaseObjectBuilder
 class DistanceTransformSplitObjectBuilder(BaseObjectBuilder):
     """Будущий builder, который умеет делить плотные скопления."""
 
-    implementation_name = "distance_transform_split"
-    is_ready = False
-
     def build(self, frame, detection):
         raise NotImplementedError("Distance-transform splitter пока не реализован.")

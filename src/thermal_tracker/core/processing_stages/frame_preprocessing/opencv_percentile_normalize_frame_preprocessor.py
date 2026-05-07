@@ -17,9 +17,6 @@ from .opencv_frame_preprocessing_utils import build_gradient, resize_if_needed, 
 class PercentileNormalizePreprocessor(BaseFramePreprocessor):
     """Сжимает хвосты распределения и растягивает рабочий диапазон."""
 
-    implementation_name = "percentile_normalize"
-    is_ready = True
-
     def __init__(self, resize_width: int | None = 960, low_percentile: float = 2.0, high_percentile: float = 98.0) -> None:
         self.resize_width = resize_width
         self.low_percentile = low_percentile

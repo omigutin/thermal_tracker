@@ -13,8 +13,5 @@ from .base_stabilizer import BaseMotionEstimator
 class TelemetryAssistedMotionEstimator(BaseMotionEstimator):
     """Будущая стабилизация с учётом внешней телеметрии."""
 
-    implementation_name = "telemetry_assisted_stabilizer"
-    is_ready = False
-
     def estimate(self, frame):
         raise NotImplementedError("Стабилизация с телеметрией пока не реализована.")

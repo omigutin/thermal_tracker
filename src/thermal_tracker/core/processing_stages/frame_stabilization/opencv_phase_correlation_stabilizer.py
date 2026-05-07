@@ -16,8 +16,6 @@ def _make_odd(value: int) -> int:
 
 
 class PhaseCorrelationMotionEstimator(BaseMotionEstimator):
-    implementation_name = "opencv_phase_correlation_stabilizer"
-    is_ready = True
     """Оценивает глобальный сдвиг кадра через фазовую корреляцию.
 
     Это не волшебство и не полноценная стабилизация, а быстрый способ

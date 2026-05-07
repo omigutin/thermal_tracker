@@ -18,7 +18,7 @@ from .base_candidate_filter import BaseCandidateFilter
 class ContrastCandidateFilter(BaseCandidateFilter):
     """Фильтр кандидатов по контрасту объекта относительно локального фона."""
 
-    min_contrast: float = 6.0
+    min_contrast: float = 5.0
     border: int = 6
 
     def filter(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion) -> list[DetectedObject]:

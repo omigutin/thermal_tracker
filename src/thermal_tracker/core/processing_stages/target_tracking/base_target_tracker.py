@@ -10,9 +10,6 @@ from ...domain.models import GlobalMotion, ProcessedFrame, TrackSnapshot
 class BaseSingleTargetTracker(ABC):
     """Любой трекер одной цели должен уметь стартовать, обновляться и сбрасываться."""
 
-    implementation_name = "base"
-    is_ready = False
-
     @abstractmethod
     def snapshot(self, motion: GlobalMotion) -> TrackSnapshot:
         """Возвращает текущее состояние трекера."""

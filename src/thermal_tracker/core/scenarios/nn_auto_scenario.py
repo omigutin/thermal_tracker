@@ -19,8 +19,8 @@ from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..nnet_interface import YoloNnetInterface
-from ..processing_stages.frame_preprocessing import IdentityFramePreprocessor
-from ..processing_stages.frame_stabilization import NoMotionEstimator, PhaseCorrelationMotionEstimator
+from ..processing_stages.frame_preprocessing import FramePreprocessorManager
+from ..processing_stages.frame_stabilization import FrameStabilizerManager
 
 
 class AutoNeuralDetectionPipeline:
@@ -31,12 +31,8 @@ class AutoNeuralDetectionPipeline:
         if self.preset.neural is None:
             raise RuntimeError(f"Пресет {preset_name!r} не содержит секцию [neural].")
 
-        self.preprocessor = IdentityFramePreprocessor(self.preset.preprocessing.resize_width)
-        self.motion_estimator = (
-            PhaseCorrelationMotionEstimator(self.preset.global_motion)
-            if self.preset.global_motion.enabled
-            else NoMotionEstimator()
-        )
+        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.method, self.preset.preprocessing)
+        self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.engine = YoloNnetInterface(self.preset.neural)
 
         self.current_frame: ProcessedFrame | None = None

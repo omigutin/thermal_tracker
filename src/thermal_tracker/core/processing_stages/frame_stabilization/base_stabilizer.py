@@ -10,9 +10,6 @@ from ...domain.models import GlobalMotion, ProcessedFrame
 class BaseMotionEstimator(ABC):
     """Любая стабилизация должна уметь оценить хотя бы грубый сдвиг кадра."""
 
-    implementation_name = "base"
-    is_ready = False
-
     @abstractmethod
     def estimate(self, frame: ProcessedFrame) -> GlobalMotion:
         """Возвращает оценку движения камеры между соседними кадрами."""

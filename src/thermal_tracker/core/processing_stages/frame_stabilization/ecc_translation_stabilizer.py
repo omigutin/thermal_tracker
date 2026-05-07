@@ -12,8 +12,5 @@ from .base_stabilizer import BaseMotionEstimator
 class EccTranslationMotionEstimator(BaseMotionEstimator):
     """Будущая реализация ECC для режима только-сдвиг."""
 
-    implementation_name = "ecc_translation_stabilizer"
-    is_ready = False
-
     def estimate(self, frame):
         raise NotImplementedError("ECC translation пока не реализован.")

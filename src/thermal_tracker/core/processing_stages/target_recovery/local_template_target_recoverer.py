@@ -13,8 +13,5 @@ class LocalTemplateReacquirer(BaseReacquirer):
     переключать стратегии независимо от основного трекера.
     """
 
-    implementation_name = "local_template"
-    is_ready = False
-
     def reacquire(self, frame, last_bbox, motion):
         raise NotImplementedError("Отдельный local reacquirer пока не вынесен из текущего трекера.")

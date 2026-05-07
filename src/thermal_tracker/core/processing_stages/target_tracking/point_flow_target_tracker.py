@@ -8,9 +8,6 @@ from .base_target_tracker import BaseSingleTargetTracker
 class PointFlowSingleTargetTracker(BaseSingleTargetTracker):
     """Будущий трекер, который опирается в основном на optical flow по точкам."""
 
-    implementation_name = "point_flow"
-    is_ready = False
-
     def snapshot(self, motion):
         raise NotImplementedError("Point-flow tracker пока не реализован.")
 

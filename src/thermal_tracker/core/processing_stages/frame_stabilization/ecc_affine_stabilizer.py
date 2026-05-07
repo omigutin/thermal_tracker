@@ -12,8 +12,5 @@ from .base_stabilizer import BaseMotionEstimator
 class EccAffineMotionEstimator(BaseMotionEstimator):
     """Будущая аффинная стабилизация на основе ECC."""
 
-    implementation_name = "ecc_affine_stabilizer"
-    is_ready = False
-
     def estimate(self, frame):
         raise NotImplementedError("ECC affine пока не реализован.")

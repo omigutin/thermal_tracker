@@ -16,9 +16,6 @@ from .opencv_frame_preprocessing_utils import build_gradient, normalize_minmax, 
 class BilateralFramePreprocessor(BaseFramePreprocessor):
     """Сглаживает шум, стараясь сохранить границы объекта."""
 
-    implementation_name = "bilateral"
-    is_ready = True
-
     def __init__(self, resize_width: int | None = 960, diameter: int = 7, sigma_color: float = 40.0, sigma_space: float = 40.0) -> None:
         self.resize_width = resize_width
         self.diameter = diameter

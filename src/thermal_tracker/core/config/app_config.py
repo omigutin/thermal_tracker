@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TypeVar
 import tomllib
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 T = TypeVar("T")
 
 

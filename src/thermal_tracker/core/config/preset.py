@@ -11,7 +11,7 @@ import tomllib
 # Имя базового пресета, к которому откатываемся при сомнительном выборе.
 DEFAULT_PRESET_NAME = "opencv_general"
 # Корень проекта нужен, чтобы искать `presets/` независимо от текущей рабочей папки.
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 # Здесь лежат все TOML-файлы с пресетами.
 PRESETS_DIR = PROJECT_ROOT / "presets"
 
@@ -19,6 +19,7 @@ PRESETS_DIR = PROJECT_ROOT / "presets"
 @dataclass
 class PreprocessingConfig:
     """Параметры базовой подготовки кадра."""
+    method: str = "thermal"  # Какой препроцессор кадра выбрать через FramePreprocessorManager.
     resize_width: int | None = 960  # Если кадр слишком широкий, уменьшаем его до этой ширины.
     gaussian_kernel: int = 5  # Размер ядра мягкого гауссова сглаживания.
     median_kernel: int = 3  # Размер ядра медианного фильтра против одиночного шума.
@@ -30,6 +31,7 @@ class PreprocessingConfig:
 @dataclass
 class GlobalMotionConfig:
     """Параметры грубой оценки движения камеры."""
+    method: str = "opencv_phase_correlation"  # Какой метод стабилизации выбрать через FrameStabilizerManager.
     enabled: bool = True  # Включать ли оценку глобального сдвига камеры.
     downscale: float = 0.5  # Во сколько раз уменьшать кадр перед фазовой корреляцией.
     blur_kernel: int = 9  # Размер сглаживания перед оценкой общего движения.
@@ -38,8 +40,33 @@ class GlobalMotionConfig:
 
 
 @dataclass
+class CandidateFilteringConfig:
+    """Параметры последовательной фильтрации кандидатов."""
+    filters: tuple[str, ...] = ("area_aspect", "border_touch", "contrast")
+
+
+@dataclass
+class MovingAreaDetectionConfig:
+    """Параметры детектора движущихся областей."""
+    method: str = "opencv_mog2"
+
+
+@dataclass
+class TargetCandidateExtractionConfig:
+    """Параметры сборки кандидатов на цель."""
+    method: str = "opencv_connected_components"
+
+
+@dataclass
+class TargetRecoveryConfig:
+    """Параметры повторного захвата цели."""
+    method: str = "local_template"
+
+
+@dataclass
 class ClickSelectionConfig:
     """Параметры начального выделения цели по одному клику."""
+    method: str = "opencv_click"  # Какой метод выбора цели использовать через TargetSelectorManager.
     search_radius: int = 80  # Базовый радиус поиска объекта вокруг точки клика.
     similarity_sigma: float = 1.35  # Насколько широко разрешаем разброс яркости вокруг клика.
     local_window_radius: int = 5  # Размер локального окна для оценки местной статистики.
@@ -64,6 +91,7 @@ class ClickSelectionConfig:
 @dataclass
 class TrackerConfig:
     """Параметры самого трекера и повторного поиска цели."""
+    method: str = "opencv_template_point"  # Какой трекер выбрать через TargetTrackerManager.
     search_margin: int = 30  # Начальный запас вокруг предсказанной позиции при обычном поиске.
     lost_search_growth: int = 26  # На сколько расширяем зону поиска при потере цели.
     full_frame_after: int = 14  # После скольких пропусков разрешаем почти полный поиск по кадру.
@@ -127,6 +155,10 @@ class TrackerPreset:
     name: str  # Короткое техническое имя пресета.
     preprocessing: PreprocessingConfig  # Настройки предобработки кадра.
     global_motion: GlobalMotionConfig  # Настройки оценки движения камеры.
+    moving_area_detection: MovingAreaDetectionConfig  # Как искать движущиеся области.
+    target_candidate_extraction: TargetCandidateExtractionConfig  # Как строить кандидатов из маски.
+    target_recovery: TargetRecoveryConfig  # Какой recoverer использовать при явном подключении stage.
+    candidate_filtering: CandidateFilteringConfig  # Какие атомарные фильтры кандидатов включены.
     click_selection: ClickSelectionConfig  # Настройки старта цели по клику.
     tracker: TrackerConfig  # Основные настройки сопровождения и повторного захвата.
     visualization: VisualizationConfig  # Настройки отрисовки служебной информации.
@@ -179,6 +211,19 @@ def _normalize_neural_section(section: dict[str, object]) -> dict[str, object]:
     return normalized
 
 
+def _normalize_candidate_filtering_section(section: dict[str, object]) -> dict[str, object]:
+    """Подготавливает список фильтров кандидатов перед созданием dataclass."""
+
+    normalized = dict(section)
+    filters = normalized.get("filters")
+    if filters is not None:
+        if isinstance(filters, str):
+            normalized["filters"] = (filters,)
+        else:
+            normalized["filters"] = tuple(str(value) for value in filters)
+    return normalized
+
+
 def _build_presentation(preset_name: str, meta: dict[str, object]) -> PresetPresentation:
     """Собирает описание пресета для интерфейса."""
     title = str(meta.get("title") or preset_name)
@@ -206,6 +251,14 @@ def _build_preset_record(path: Path) -> _PresetRecord:
 
     preprocessing = PreprocessingConfig(**dict(data.get("preprocessing", {})))
     global_motion = GlobalMotionConfig(**dict(data.get("global_motion", {})))
+    moving_area_detection = MovingAreaDetectionConfig(**dict(data.get("moving_area_detection", {})))
+    target_candidate_extraction = TargetCandidateExtractionConfig(
+        **dict(data.get("target_candidate_extraction", {}))
+    )
+    target_recovery = TargetRecoveryConfig(**dict(data.get("target_recovery", {})))
+    candidate_filtering = CandidateFilteringConfig(
+        **_normalize_candidate_filtering_section(dict(data.get("candidate_filtering", {})))
+    )
     click_selection = ClickSelectionConfig(**dict(data.get("click_selection", {})))
     tracker = TrackerConfig(**_normalize_tracker_section(dict(data.get("tracking", {}))))
     visualization = VisualizationConfig(**dict(data.get("visualization", {})))
@@ -221,6 +274,10 @@ def _build_preset_record(path: Path) -> _PresetRecord:
             name=preset_name,
             preprocessing=preprocessing,
             global_motion=global_motion,
+            moving_area_detection=moving_area_detection,
+            target_candidate_extraction=target_candidate_extraction,
+            target_recovery=target_recovery,
+            candidate_filtering=candidate_filtering,
             click_selection=click_selection,
             tracker=tracker,
             visualization=visualization,

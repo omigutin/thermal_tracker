@@ -7,6 +7,3 @@ from .opencv_click_target_selector import ClickTargetSelector
 
 class ThresholdRegionGrowClickInitializer(ClickTargetSelector):
     """Пока переиспользует текущую рабочую гибридную реализацию."""
-
-    implementation_name = "threshold_region_grow_target_selector"
-    is_ready = True

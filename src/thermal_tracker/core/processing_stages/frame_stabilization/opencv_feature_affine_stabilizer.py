@@ -18,9 +18,6 @@ from .base_stabilizer import BaseMotionEstimator
 class FeatureAffineMotionEstimator(BaseMotionEstimator):
     """Оценивает глобальное движение по набору хороших точек."""
 
-    implementation_name = "opencv_feature_affine_stabilizer"
-    is_ready = True
-
     def __init__(
         self,
         max_corners: int = 120,

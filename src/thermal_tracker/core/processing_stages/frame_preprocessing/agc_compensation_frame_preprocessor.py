@@ -14,8 +14,5 @@ from .base_frame_preprocessor import BaseFramePreprocessor
 class AgcCompensationPreprocessor(BaseFramePreprocessor):
     """Будущий препроцессор против артефактов автоконтраста."""
 
-    implementation_name = "agc_compensation"
-    is_ready = False
-
     def process(self, frame) -> ProcessedFrame:
         raise NotImplementedError("Компенсация AGC пока не реализована.")

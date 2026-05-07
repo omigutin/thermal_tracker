@@ -18,7 +18,20 @@ description = """
 # Явно говорим, какой сценарий должен быть собран для этого пресета.
 kind = "manual_click_classical"
 
+[candidate_filtering]
+filters = ["area_aspect", "border_touch", "contrast"]
+
+[moving_area_detection]
+method = "opencv_mog2"
+
+[target_candidate_extraction]
+method = "opencv_connected_components"
+
+[target_recovery]
+method = "local_template"
+
 [preprocessing]
+method = "thermal"
 # Если кадр слишком широкий, уменьшаем его до этой ширины перед обработкой.
 resize_width = 960
 # Размер гауссова размытия для мягкого подавления обычного шума.
@@ -33,6 +46,7 @@ clahe_tile_grid_size = 8
 gradient_blur_kernel = 3
 
 [global_motion]
+method = "opencv_phase_correlation"
 # Включать ли оценку общего движения камеры.
 enabled = true
 # Во сколько раз уменьшать кадр перед phase correlation.
@@ -45,6 +59,7 @@ min_response = 0.025
 max_shift_ratio = 0.4
 
 [click_selection]
+method = "opencv_click"
 # Радиус первичного поиска объекта вокруг точки клика.
 search_radius = 60
 # Насколько широко разрешаем разброс яркости вокруг пикселя клика.
@@ -85,6 +100,7 @@ max_expanded_fill = 0.28
 max_expansion_ratio = 2.2
 
 [tracking]
+method = "opencv_template_point"
 # Запас вокруг предсказанной позиции при обычном поиске.
 search_margin = 18
 # На сколько расширяем область поиска, когда цель начала теряться.

@@ -12,6 +12,6 @@ from enum import StrEnum
 
 class CandidateFilterType(StrEnum):
     """ Доступные типы атомарных фильтров кандидатов. """
-    AREA_ASPECT = "area_aspect"
-    BORDER_TOUCH = "border_touch"
-    CONTRAST = "contrast"
+    AREA_ASPECT = "area_aspect"  # Отсекает кандидатов по площади и пропорциям рамки.
+    BORDER_TOUCH = "border_touch"  # Убирает кандидатов, которые подозрительно касаются края кадра.
+    CONTRAST = "contrast"  # Проверяет, что кандидат заметно отличается от локального фона.

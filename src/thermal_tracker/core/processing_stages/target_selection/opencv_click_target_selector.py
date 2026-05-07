@@ -8,30 +8,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import cv2
 import numpy as np
 
 from ...config import ClickSelectionConfig
 from ...domain.models import BoundingBox, ProcessedFrame, SelectionResult
 from .base_target_selector import BaseClickInitializer
-
-
-@dataclass
-class _LocalPatch:
-    """Локальный кусок кадра вокруг клика или текущего бокса."""
-
-    image: np.ndarray
-    origin_x: int
-    origin_y: int
-    local_x: int
-    local_y: int
+from .local_patch import LocalPatch
 
 
 class ClickTargetSelector(BaseClickInitializer):
-    implementation_name = "hybrid_click"
-    is_ready = True
     """Ищет объект вокруг точки и возвращает прямоугольник цели."""
 
     def __init__(self, config: ClickSelectionConfig) -> None:
@@ -114,7 +100,7 @@ class ClickTargetSelector(BaseClickInitializer):
             return None
         return selection
 
-    def _snap_patch_point(self, patch: _LocalPatch) -> _LocalPatch:
+    def _snap_patch_point(self, patch: LocalPatch) -> LocalPatch:
         """Чуть сдвигает клик к ближайшему выразительному пикселю цели."""
 
         radius = max(6, self.config.local_window_radius * 2 + 2)
@@ -149,7 +135,7 @@ class ClickTargetSelector(BaseClickInitializer):
         if float(deviation[best_y, best_x]) < self.config.min_object_contrast:
             return patch
 
-        return _LocalPatch(
+        return LocalPatch(
             image=patch.image,
             origin_x=patch.origin_x,
             origin_y=patch.origin_y,
@@ -157,7 +143,7 @@ class ClickTargetSelector(BaseClickInitializer):
             local_y=int(y1 + best_y),
         )
 
-    def _expand_selection(self, patch: _LocalPatch, selection: SelectionResult) -> SelectionResult:
+    def _expand_selection(self, patch: LocalPatch, selection: SelectionResult) -> SelectionResult:
         """Пытается превратить яркое ядро в бокс всего объекта."""
 
         local_seed = BoundingBox(
@@ -262,7 +248,7 @@ class ClickTargetSelector(BaseClickInitializer):
 
     def _select_contrast_component(
         self,
-        patch: _LocalPatch,
+        patch: LocalPatch,
         frame_shape: tuple[int, int] | tuple[int, int, int],
     ) -> SelectionResult | None:
         """Выбирает цель как отдельный контрастный компонент вокруг клика."""
@@ -455,7 +441,7 @@ class ClickTargetSelector(BaseClickInitializer):
         point: tuple[int, int],
         expected_bbox: BoundingBox | None,
         radius_override: int | None = None,
-    ) -> _LocalPatch:
+    ) -> LocalPatch:
         """Вырезает локальный патч вокруг точки интереса."""
 
         frame_h, frame_w = image.shape[:2]
@@ -472,7 +458,7 @@ class ClickTargetSelector(BaseClickInitializer):
         y1 = max(0, y - radius)
         x2 = min(frame_w, x + radius + 1)
         y2 = min(frame_h, y + radius + 1)
-        return _LocalPatch(
+        return LocalPatch(
             image=image[y1:y2, x1:x2],
             origin_x=x1,
             origin_y=y1,
@@ -548,7 +534,7 @@ class ClickTargetSelector(BaseClickInitializer):
     def _extract_component(
         self,
         mask: np.ndarray,
-        patch: _LocalPatch,
+        patch: LocalPatch,
         expected_bbox: BoundingBox | None,
     ) -> tuple[BoundingBox | None, float]:
         """Берёт компоненту связности, к которой относится клик."""
@@ -681,7 +667,7 @@ class ClickTargetSelector(BaseClickInitializer):
 
     def _tighten_large_component(
         self,
-        patch: _LocalPatch,
+        patch: LocalPatch,
         original_bbox: BoundingBox,
         original_area: int,
     ) -> tuple[BoundingBox | None, int]:
@@ -799,7 +785,7 @@ class ClickTargetSelector(BaseClickInitializer):
         )
 
     @staticmethod
-    def _touches_patch_border(bbox: BoundingBox, patch: _LocalPatch, tolerance: int = 2) -> bool:
+    def _touches_patch_border(bbox: BoundingBox, patch: LocalPatch, tolerance: int = 2) -> bool:
         """Проверяет, не упёрлась ли найденная область в край локального патча."""
 
         local_x1 = bbox.x - patch.origin_x

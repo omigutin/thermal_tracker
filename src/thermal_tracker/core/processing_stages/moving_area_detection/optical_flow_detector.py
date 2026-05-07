@@ -8,8 +8,5 @@ from .base_moving_area_detector import BaseMotionDetector
 class OpticalFlowMotionDetector(BaseMotionDetector):
     """Будущий детектор движения на основе поля оптического потока."""
 
-    implementation_name = "optical_flow"
-    is_ready = False
-
     def detect(self, frame, motion):
         raise NotImplementedError("Optical-flow детектор пока не реализован.")

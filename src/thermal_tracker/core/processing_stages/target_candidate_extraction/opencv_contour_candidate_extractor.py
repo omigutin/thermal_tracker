@@ -11,9 +11,6 @@ from .base_candidate_extractor import BaseObjectBuilder
 class ContourObjectBuilder(BaseObjectBuilder):
     """Ищет внешние контуры и упаковывает их в объекты."""
 
-    implementation_name = "contour"
-    is_ready = True
-
     def __init__(self, min_area: int = 24) -> None:
         self.min_area = min_area
 
@@ -32,7 +29,6 @@ class ContourObjectBuilder(BaseObjectBuilder):
                     area=area,
                     confidence=min(1.0, area / max(self.min_area, 1)),
                     label="motion_contour",
-                    source=self.implementation_name,
                 )
             )
         return objects

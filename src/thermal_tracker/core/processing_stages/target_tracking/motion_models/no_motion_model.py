@@ -9,9 +9,6 @@ from .base_motion_model import BaseMotionModel
 class NoMotionModel(BaseMotionModel):
     """Просто помнит последний bbox и ничего не предсказывает умнее этого."""
 
-    implementation_name = "none"
-    is_ready = True
-
     def __init__(self) -> None:
         self._bbox: BoundingBox | None = None
 

@@ -21,6 +21,7 @@ description = """
 kind = "manual_click_neural"
 
 [preprocessing]
+method = "identity"
 # Для neural-режима это в основном ограничение размера кадра, чтобы не душить железо.
 resize_width = 960
 # Эти параметры остаются для общей схемы пресетов, но в данном режиме почти не влияют,
@@ -32,6 +33,7 @@ clahe_tile_grid_size = 8
 gradient_blur_kernel = 1
 
 [global_motion]
+method = "opencv_phase_correlation"
 # Пока оставляем оценку движения камеры включённой для статуса и будущего reacquire.
 enabled = true
 downscale = 0.5
@@ -40,6 +42,7 @@ min_response = 0.03
 max_shift_ratio = 0.35
 
 [click_selection]
+method = "opencv_click"
 # Если клик не попал прямо в bbox, пробуем ближайшую детекцию в этом радиусе.
 search_radius = 100
 similarity_sigma = 1.35
@@ -62,6 +65,7 @@ max_expanded_fill = 0.58
 max_expansion_ratio = 5.5
 
 [tracking]
+method = "nn_yolo"
 # В neural-режиме эти параметры в основном управляют повторным захватом вручную выбранной цели.
 search_margin = 30
 lost_search_growth = 26

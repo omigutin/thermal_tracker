@@ -10,9 +10,6 @@ from ...domain.models import DetectedObject, MotionDetectionResult, ProcessedFra
 class BaseObjectBuilder(ABC):
     """Преобразует сырую маску или отклик детектора в список объектов."""
 
-    implementation_name = "base"
-    is_ready = False
-
     @abstractmethod
     def build(self, frame: ProcessedFrame, detection: MotionDetectionResult) -> list[DetectedObject]:
         """Возвращает список найденных объектов."""

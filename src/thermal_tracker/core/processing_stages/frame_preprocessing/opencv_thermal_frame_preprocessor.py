@@ -23,8 +23,6 @@ def _make_odd(value: int) -> int:
 
 
 class ThermalFramePreprocessor(BaseFramePreprocessor):
-    implementation_name = "thermal_composite"
-    is_ready = True
     """Готовит кадр так, чтобы трекеру было проще жить."""
 
     def __init__(self, config: PreprocessingConfig) -> None:

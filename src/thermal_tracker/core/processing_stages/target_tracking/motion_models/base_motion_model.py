@@ -10,9 +10,6 @@ from ....domain.models import BoundingBox
 class BaseMotionModel(ABC):
     """Модель движения не трекает цель сама по себе, а только помогает прогнозом."""
 
-    implementation_name = "base"
-    is_ready = False
-
     @abstractmethod
     def reset(self) -> None:
         """Сбрасывает внутреннее состояние модели."""

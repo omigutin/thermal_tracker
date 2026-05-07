@@ -16,8 +16,5 @@ from .base_frame_preprocessor import BaseFramePreprocessor
 class TemporalDenoisePreprocessor(BaseFramePreprocessor):
     """Будущий препроцессор с накоплением нескольких кадров."""
 
-    implementation_name = "temporal_denoise"
-    is_ready = False
-
     def process(self, frame) -> ProcessedFrame:
         raise NotImplementedError("Временное подавление шума пока не реализовано.")

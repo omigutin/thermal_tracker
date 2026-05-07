@@ -9,9 +9,6 @@ from .base_motion_model import BaseMotionModel
 class ConstantVelocityMotionModel(BaseMotionModel):
     """Держит последний bbox и примитивную скорость его центра."""
 
-    implementation_name = "constant_velocity"
-    is_ready = True
-
     def __init__(self) -> None:
         self._bbox: BoundingBox | None = None
         self._vx = 0.0

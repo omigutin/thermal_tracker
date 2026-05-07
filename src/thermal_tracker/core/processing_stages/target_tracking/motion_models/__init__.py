@@ -1,4 +1,4 @@
-﻿"""Модели движения для трекеров."""
+"""Модели движения для трекеров."""
 
 from .base_motion_model import BaseMotionModel
 from .constant_velocity_motion_model import ConstantVelocityMotionModel

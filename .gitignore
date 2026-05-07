@@ -223,6 +223,7 @@ __marimo__/
 /out/
 /configs/desktop_client_state.json
 /src/thermal_tracker/gui/gui_state.json
+/src/thermal_tracker/client/gui/gui_state.json
 /src/thermal_tracker_client/gui/gui_state.json
 /models/yolo26m.pt
 /models/yolo26n.pt

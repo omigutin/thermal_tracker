@@ -14,16 +14,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import cv2
 import numpy as np
 
 from ...config import ClickSelectionConfig, TrackerConfig
 from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
-from ..target_selection import ClickTargetSelector
+from ..target_selection import TargetSelectorManager
 from .base_target_tracker import BaseSingleTargetTracker
 from .motion_models import KalmanMotionModel
+from .point_prediction import PointPrediction
+from .search_result import SearchResult
 
 
 def _safe_resize(image: np.ndarray, size: tuple[int, int]) -> np.ndarray:
@@ -52,21 +52,6 @@ def _correlation(image: np.ndarray, template: np.ndarray) -> float:
     return float(score_map[0, 0])
 
 
-@dataclass
-class _SearchResult:
-    """Лучший найденный кандидат на текущем кадре."""
-    bbox: BoundingBox
-    score: float
-    search_region: BoundingBox
-
-
-@dataclass
-class _PointPrediction:
-    """Прогноз положения цели по опорным точкам."""
-    bbox: BoundingBox
-    confidence: float
-
-
 class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
     """Трекер одной цели по клику.
     Логика простая:
@@ -77,12 +62,9 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
     - если цель пропала, расширяем область поиска и пытаемся вернуть тот же ID.
     """
 
-    implementation_name = "hybrid_template_point"
-    is_ready = True
-
     def __init__(self, tracker_config: TrackerConfig, click_config: ClickSelectionConfig) -> None:
         self.config = tracker_config
-        self.selector = ClickTargetSelector(click_config)
+        self.selector = TargetSelectorManager(click_config.method, click_config)
         self._next_track_id = 0
         self._track_id: int | None = None
         self._state: TrackerState = TrackerState.IDLE
@@ -219,7 +201,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
                 or (frame_degraded and not trusted_measurement)
                 or (self._state == TrackerState.SEARCHING and not trusted_measurement)
             ):
-                search = _SearchResult(bbox=measured_bbox, score=-1.0, search_region=search.search_region)
+                search = SearchResult(bbox=measured_bbox, score=-1.0, search_region=search.search_region)
             else:
                 if trusted_measurement:
                     if not frame_degraded:
@@ -304,7 +286,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self,
         frame_shape: tuple[int, int] | tuple[int, int, int],
         global_motion: GlobalMotion,
-        point_prediction: _PointPrediction | None = None,
+        point_prediction: PointPrediction | None = None,
     ) -> BoundingBox:
         """Строит прогноз по модели движения, точкам и сдвигу камеры."""
         assert self._bbox is not None
@@ -337,7 +319,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         )
         return predicted.clamp(frame_shape)
 
-    def _predict_from_points(self, frame: ProcessedFrame) -> _PointPrediction | None:
+    def _predict_from_points(self, frame: ProcessedFrame) -> PointPrediction | None:
         """Пробует спрогнозировать движение цели по опорным точкам внутри объекта."""
         if self._previous_normalized is None or self._tracked_points is None or self._bbox is None:
             return None
@@ -390,7 +372,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         ).clamp(frame.bgr.shape)
 
         confidence = min(1.0, len(current_points) / max(float(self.config.max_feature_points), 1.0))
-        return _PointPrediction(bbox=predicted_bbox, confidence=confidence)
+        return PointPrediction(bbox=predicted_bbox, confidence=confidence)
 
     def _build_search_region(
         self,
@@ -417,8 +399,8 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         self,
         frame: ProcessedFrame,
         predicted_bbox: BoundingBox,
-        point_prediction: _PointPrediction | None,
-    ) -> _SearchResult | None:
+        point_prediction: PointPrediction | None,
+    ) -> SearchResult | None:
         """Ищет лучший кандидат цели на кадре."""
         if self._canonical_size is None or self._adaptive_gray is None or self._long_term_gray is None:
             return None
@@ -432,7 +414,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         if search_gray is None:
             return None
 
-        best_result: _SearchResult | None = None
+        best_result: SearchResult | None = None
         for scale in self.config.scales:
             candidate_width = max(self.config.min_box_size, int(round(predicted_bbox.width * scale)))
             candidate_height = max(self.config.min_box_size, int(round(predicted_bbox.height * scale)))
@@ -466,7 +448,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         predicted_bbox: BoundingBox,
         *,
         frame_degraded: bool,
-    ) -> _SearchResult | None:
+    ) -> SearchResult | None:
         """Ищет яркую/холодную компоненту рядом с прогнозом, когда шаблон не сработал."""
 
         point = (int(predicted_bbox.center[0]), int(predicted_bbox.center[1]))
@@ -499,7 +481,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
             if frame_degraded
             else min(self.config.template_update_threshold - 0.02, self.config.track_threshold + 0.18)
         )
-        return _SearchResult(bbox=candidate_bbox, score=score, search_region=search_region)
+        return SearchResult(bbox=candidate_bbox, score=score, search_region=search_region)
 
     def _evaluate_template_pair(
         self,
@@ -511,8 +493,8 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         candidate_width: int,
         candidate_height: int,
         predicted_bbox: BoundingBox,
-        point_prediction: _PointPrediction | None,
-    ) -> _SearchResult | None:
+        point_prediction: PointPrediction | None,
+    ) -> SearchResult | None:
         """Проверяет кандидатов по двум шаблонам: адаптивному и долгому."""
         response_primary = cv2.matchTemplate(search_gray, template_gray, cv2.TM_CCOEFF_NORMED)
         response_fallback = cv2.matchTemplate(search_gray, fallback_template, cv2.TM_CCOEFF_NORMED)
@@ -545,7 +527,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         if best_bbox is None:
             return None
 
-        return _SearchResult(bbox=best_bbox, score=best_score, search_region=search_region)
+        return SearchResult(bbox=best_bbox, score=best_score, search_region=search_region)
 
     def _collect_template_candidates(
         self,
@@ -579,7 +561,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         predicted_bbox: BoundingBox,
         template_score: float,
         search_region: BoundingBox,
-        point_prediction: _PointPrediction | None,
+        point_prediction: PointPrediction | None,
     ) -> float:
         """Считает итоговый балл кандидата.
 

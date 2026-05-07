@@ -53,6 +53,7 @@ norecursedirs = [
     ".venv",
     ".pytest_cache",
     "__pycache__",
+    "pytest-cache-files-*",
     "out",
     "video",
 ]

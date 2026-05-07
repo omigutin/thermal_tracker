@@ -19,16 +19,11 @@ import numpy as np
 from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, MotionDetectionResult, ProcessedFrame
 from ..domain.runtime import AutoScenarioStepResult
-from ..processing_stages.candidate_filtering import (
-    AreaAspectCandidateFilter,
-    BorderTouchCandidateFilter,
-    ContrastCandidateFilter,
-    CandidateFilterManager,
-)
-from ..processing_stages.moving_area_detection import Mog2MotionDetector
-from ..processing_stages.target_candidate_extraction import ConnectedComponentsObjectBuilder
-from ..processing_stages.frame_preprocessing import ThermalFramePreprocessor
-from ..processing_stages.frame_stabilization import PhaseCorrelationMotionEstimator
+from ..processing_stages.candidate_filtering import CandidateFilterManager
+from ..processing_stages.moving_area_detection import MovingAreaDetectorManager
+from ..processing_stages.target_candidate_extraction import TargetCandidateExtractorManager
+from ..processing_stages.frame_preprocessing import FramePreprocessorManager
+from ..processing_stages.frame_stabilization import FrameStabilizerManager
 
 
 class AutoMotionTrackingPipeline:
@@ -36,17 +31,11 @@ class AutoMotionTrackingPipeline:
 
     def __init__(self, preset_name: str) -> None:
         self.preset: TrackerPreset = build_preset(preset_name)
-        self.preprocessor = ThermalFramePreprocessor(self.preset.preprocessing)
-        self.motion_estimator = PhaseCorrelationMotionEstimator(self.preset.global_motion)
-        self.motion_detector = Mog2MotionDetector()
-        self.object_builder = ConnectedComponentsObjectBuilder()
-        self.false_target_filter = CandidateFilterManager(
-            [
-                AreaAspectCandidateFilter(min_area=24),
-                BorderTouchCandidateFilter(border_margin=2),
-                ContrastCandidateFilter(min_contrast=5.0),
-            ]
-        )
+        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.method, self.preset.preprocessing)
+        self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
+        self.motion_detector = MovingAreaDetectorManager(self.preset.moving_area_detection.method)
+        self.object_builder = TargetCandidateExtractorManager(self.preset.target_candidate_extraction.method)
+        self.false_target_filter = CandidateFilterManager(self.preset.candidate_filtering.filters)
 
         self.current_frame: ProcessedFrame | None = None
         self.current_motion: GlobalMotion = GlobalMotion()

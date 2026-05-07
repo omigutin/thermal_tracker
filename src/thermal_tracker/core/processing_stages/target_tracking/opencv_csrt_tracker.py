@@ -21,9 +21,6 @@ def _resolve_csrt_factory():
 class CsrtSingleTargetTracker(BaseSingleTargetTracker):
     """Трекер одной цели на базе готового CSRT."""
 
-    implementation_name = "csrt"
-    is_ready = True
-
     def __init__(self, tracker_config: TrackerConfig, click_config: ClickSelectionConfig) -> None:
         self.config = tracker_config
         self.selector = ClickTargetSelector(click_config)

@@ -15,12 +15,12 @@ from enum import StrEnum
 class FramePreprocessorType(StrEnum):
     """ Доступные типы препроцессоров кадра. """
 
-    IDENTITY = "identity"
-    THERMAL = "thermal"
-    BILATERAL = "bilateral"
-    CLAHE_CONTRAST = "clahe_contrast"
-    PERCENTILE_NORMALIZE = "percentile_normalize"
+    IDENTITY = "identity"  # Возвращает кадр без смысловой обработки, только в общем формате ProcessedFrame.
+    THERMAL = "thermal"  # Базовая тепловизионная подготовка: grayscale, нормализация, сглаживание, градиент.
+    BILATERAL = "bilateral"  # Подавляет шум, стараясь сохранить границы объектов.
+    CLAHE_CONTRAST = "clahe_contrast"  # Усиливает локальный контраст через CLAHE.
+    PERCENTILE_NORMALIZE = "percentile_normalize"  # Нормализует яркость по процентилям, отрезая выбросы.
 
-    # AGC_COMPENSATION = "agc_compensation"
-    # GRADIENT_ENHANCED = "gradient_enhanced"
-    # TEMPORAL_DENOISE = "temporal_denoise"
+    # AGC_COMPENSATION = "agc_compensation"  # Компенсация авто-подстройки яркости тепловизора.
+    # GRADIENT_ENHANCED = "gradient_enhanced"  # Подчёркивание границ и мелких контрастных деталей.
+    # TEMPORAL_DENOISE = "temporal_denoise"  # Подавление шума с учетом соседних кадров.

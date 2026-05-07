@@ -10,9 +10,6 @@ from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame
 class BaseReacquirer(ABC):
     """Пытается вернуть цель после потери."""
 
-    implementation_name = "base"
-    is_ready = False
-
     @abstractmethod
     def reacquire(
         self,

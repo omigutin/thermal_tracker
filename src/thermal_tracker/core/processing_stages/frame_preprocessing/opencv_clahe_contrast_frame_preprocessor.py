@@ -16,9 +16,6 @@ from .opencv_frame_preprocessing_utils import build_gradient, normalize_minmax, 
 class ClaheContrastPreprocessor(BaseFramePreprocessor):
     """Усиливает локальный контраст через CLAHE."""
 
-    implementation_name = "clahe_contrast"
-    is_ready = True
-
     def __init__(self, resize_width: int | None = 960, clip_limit: float = 2.0, tile_grid_size: int = 8) -> None:
         self.resize_width = resize_width
         self._clahe = cv2.createCLAHE(

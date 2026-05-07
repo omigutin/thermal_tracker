@@ -8,9 +8,6 @@ from .base_target_tracker import BaseSingleTargetTracker
 class TemplateSingleTargetTracker(BaseSingleTargetTracker):
     """Будущий трекер, который опирается почти только на внешний вид цели."""
 
-    implementation_name = "template_only"
-    is_ready = False
-
     def snapshot(self, motion):
         raise NotImplementedError("Template-only tracker пока не реализован.")
 

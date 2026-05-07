@@ -1,17 +1,9 @@
-﻿"""Сборка объектов из сырых результатов детекта."""
+"""Публичный API стадии сборки кандидатов на цель."""
 
-from .base_candidate_extractor import BaseObjectBuilder
-from .blob_candidate_extractor import BlobObjectBuilder
-from .opencv_connected_components_candidate_extractor import ConnectedComponentsObjectBuilder
-from .opencv_contour_candidate_extractor import ContourObjectBuilder
-from .distance_transform_candidate_extractor import DistanceTransformSplitObjectBuilder
-from .watershed_candidate_extractor import WatershedObjectBuilder
+from .target_candidate_extractor_manager import TargetCandidateExtractorManager
+from .target_candidate_extractor_type import TargetCandidateExtractorType
 
-__all__ = [
-    "BaseObjectBuilder",
-    "BlobObjectBuilder",
-    "ConnectedComponentsObjectBuilder",
-    "ContourObjectBuilder",
-    "DistanceTransformSplitObjectBuilder",
-    "WatershedObjectBuilder",
-]
+__all__ = (
+    "TargetCandidateExtractorManager",
+    "TargetCandidateExtractorType",
+)

@@ -8,9 +8,6 @@ from .base_target_tracker import BaseSingleTargetTracker
 class KcfSingleTargetTracker(BaseSingleTargetTracker):
     """Будущий KCF-baseline для быстрых сравнений."""
 
-    implementation_name = "kcf"
-    is_ready = False
-
     def snapshot(self, motion):
         raise NotImplementedError("KCF tracker пока не реализован.")
 

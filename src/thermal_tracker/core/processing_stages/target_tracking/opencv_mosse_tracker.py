@@ -8,9 +8,6 @@ from .base_target_tracker import BaseSingleTargetTracker
 class MosseSingleTargetTracker(BaseSingleTargetTracker):
     """Будущий очень быстрый baseline для дешёвых платформ."""
 
-    implementation_name = "mosse"
-    is_ready = False
-
     def snapshot(self, motion):
         raise NotImplementedError("MOSSE tracker пока не реализован.")
 

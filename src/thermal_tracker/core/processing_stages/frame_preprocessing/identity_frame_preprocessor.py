@@ -17,9 +17,6 @@ from .opencv_frame_preprocessing_utils import build_gradient, normalize_minmax, 
 class IdentityFramePreprocessor(BaseFramePreprocessor):
     """Возвращает кадр почти как есть."""
 
-    implementation_name = "identity"
-    is_ready = True
-
     def __init__(self, resize_width: int | None = 960) -> None:
         self.resize_width = resize_width
 

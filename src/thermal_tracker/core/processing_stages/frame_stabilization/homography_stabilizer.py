@@ -14,8 +14,5 @@ from .base_stabilizer import BaseMotionEstimator
 class HomographyMotionEstimator(BaseMotionEstimator):
     """Будущая стабилизация через оценку гомографии."""
 
-    implementation_name = "homography_stabilizer"
-    is_ready = False
-
     def estimate(self, frame):
         raise NotImplementedError("Стабилизация через гомографию пока не реализована.")

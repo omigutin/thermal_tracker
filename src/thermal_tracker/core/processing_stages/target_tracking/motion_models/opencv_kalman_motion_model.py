@@ -12,9 +12,6 @@ from .base_motion_model import BaseMotionModel
 class KalmanMotionModel(BaseMotionModel):
     """Хранит состояние `[x, y, w, h, vx, vy, vw, vh]`."""
 
-    implementation_name = "kalman"
-    is_ready = True
-
     def __init__(self) -> None:
         self._filter = cv2.KalmanFilter(8, 4)
         self._filter.transitionMatrix = np.array(

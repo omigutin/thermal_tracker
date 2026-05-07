@@ -12,9 +12,9 @@ import numpy as np
 from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
-from ..processing_stages.frame_preprocessing import ThermalFramePreprocessor
-from ..processing_stages.frame_stabilization import PhaseCorrelationMotionEstimator
-from ..processing_stages.target_tracking import ClickToTrackSingleTargetTracker
+from ..processing_stages.frame_preprocessing import FramePreprocessorManager
+from ..processing_stages.frame_stabilization import FrameStabilizerManager
+from ..processing_stages.target_tracking import TargetTrackerManager
 
 
 class ManualClickTrackingPipeline:
@@ -22,9 +22,14 @@ class ManualClickTrackingPipeline:
 
     def __init__(self, preset_name: str, preset_override: TrackerPreset | None = None) -> None:
         self.preset: TrackerPreset = preset_override or build_preset(preset_name)
-        self.preprocessor = ThermalFramePreprocessor(self.preset.preprocessing)
-        self.motion_estimator = PhaseCorrelationMotionEstimator(self.preset.global_motion)
-        self.tracker = ClickToTrackSingleTargetTracker(self.preset.tracker, self.preset.click_selection)
+        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.method, self.preset.preprocessing)
+        self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
+        self.tracker = TargetTrackerManager(
+            self.preset.tracker.method,
+            self.preset.tracker,
+            self.preset.click_selection,
+            self.preset.neural,
+        )
 
         self.current_frame: ProcessedFrame | None = None
         self.current_snapshot: TrackSnapshot = self.tracker.snapshot(GlobalMotion())

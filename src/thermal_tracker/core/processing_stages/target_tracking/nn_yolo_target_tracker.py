@@ -25,9 +25,6 @@ def _point_inside_bbox(point: tuple[int, int], bbox: BoundingBox) -> bool:
 class YoloTrackSingleTargetTracker(BaseSingleTargetTracker):
     """Ведёт одну выбранную цель поверх общего NN-потока сопровождения."""
 
-    implementation_name = "yolo_track_single_target"
-    is_ready = True
-
     def __init__(
         self,
         tracker_config: TrackerConfig,
