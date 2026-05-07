@@ -60,6 +60,7 @@ def run_sender(
     frame_interval = 1.0 / max(1e-6, float(fps))
     frame_id = 0
     sent = 0
+    http_latency_sum_ms = 0.0
     report_started = time.perf_counter()
     try:
         while max_frames <= 0 or sent < max_frames:
@@ -76,19 +77,26 @@ def run_sender(
                 gray = cv2.resize(gray, (width, height), interpolation=cv2.INTER_AREA)
 
             frame_id += 1
-            _post_frame(
+            http_latency_ms = _post_frame(
                 endpoint,
                 gray.tobytes(),
                 frame_id=frame_id,
                 timestamp_ns=now_ns(),
                 timeout=timeout,
             )
+            http_latency_sum_ms += http_latency_ms
             sent += 1
 
             if report_every > 0 and sent % report_every == 0:
                 elapsed_report = max(time.perf_counter() - report_started, 1e-6)
-                print(f"sent={sent} fps={report_every / elapsed_report:.2f}", flush=True)
+                avg_http_latency_ms = http_latency_sum_ms / report_every
+                print(
+                    f"sent={sent} fps={report_every / elapsed_report:.2f} "
+                    f"avg_http_post_ms={avg_http_latency_ms:.2f}",
+                    flush=True,
+                )
                 report_started = time.perf_counter()
+                http_latency_sum_ms = 0.0
 
             elapsed = time.perf_counter() - started
             sleep_seconds = frame_interval - elapsed
@@ -98,7 +106,7 @@ def run_sender(
         capture.release()
 
 
-def _post_frame(endpoint: str, payload: bytes, *, frame_id: int, timestamp_ns: int, timeout: float) -> None:
+def _post_frame(endpoint: str, payload: bytes, *, frame_id: int, timestamp_ns: int, timeout: float) -> float:
     """Отправляет один RAW Y8 кадр HTTP POST-ом."""
 
     query = urlencode({"frame_id": frame_id, "timestamp_ns": timestamp_ns})
@@ -108,9 +116,11 @@ def _post_frame(endpoint: str, payload: bytes, *, frame_id: int, timestamp_ns: i
         method="POST",
         headers={"Content-Type": "application/octet-stream"},
     )
+    started = time.perf_counter()
     with urlopen(request, timeout=timeout) as response:
         if response.status >= 400:
             raise RuntimeError(f"Gateway вернул HTTP {response.status}.")
+    return (time.perf_counter() - started) * 1000.0
 
 
 def main() -> None:

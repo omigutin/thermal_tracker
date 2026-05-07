@@ -45,3 +45,4 @@ python run_runtime.py
 - [Architecture](docs/architecture.md)
 - [Terminology](docs/terminology.md)
 - [Project Structure](docs/project_structure.md)
+- [Shared Memory Gateway](docs/shared_memory_gateway.md)

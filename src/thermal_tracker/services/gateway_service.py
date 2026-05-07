@@ -7,7 +7,10 @@ Gateway живёт на той же машине, что и Shared Memory. Вн�
 from __future__ import annotations
 
 import argparse
+from collections import deque
 from dataclasses import dataclass
+import json
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -47,6 +50,20 @@ class GatewayConfig:
     height: int = DEFAULT_FRAME_HEIGHT
     host: str = "0.0.0.0"
     port: int = 8080
+    ingress_log_path: str = ""
+
+
+@dataclass
+class GatewayStats:
+    """Накопленные диагностические метрики gateway."""
+
+    received_frames: int = 0
+    first_received_ns: int = 0
+    last_received_ns: int = 0
+    last_frame_id: int = 0
+    last_payload_bytes: int = 0
+    last_http_write_ms: float = 0.0
+    last_remote_timestamp_ns: int | None = None
 
 
 class SharedMemoryGateway:
@@ -73,16 +90,20 @@ class SharedMemoryGateway:
         self._result_buffer: SharedMemoryJsonBuffer | None = None
         self._last_result_message_id = 0
         self._last_result_payload: dict[str, Any] | None = None
+        self._stats = GatewayStats()
+        self._recent_frame_times_ns: deque[int] = deque(maxlen=120)
+        self._ingress_log_file = _open_jsonl_log(config.ingress_log_path)
 
     def publish_raw_y8(
         self,
         payload: bytes,
         *,
         frame_id: int | None = None,
-        timestamp_ns: int | None = None,
+        remote_timestamp_ns: int | None = None,
     ) -> dict[str, Any]:
         """Публикует сетевой RAW Y8 кадр в Shared Memory."""
 
+        received_ns = now_ns()
         expected_size = self.config.width * self.config.height
         if len(payload) != expected_size:
             raise ValueError(f"RAW Y8 кадр должен занимать {expected_size} байт, получено {len(payload)}.")
@@ -91,9 +112,21 @@ class SharedMemoryGateway:
         written = self.frame_buffer.write_frame(
             image,
             frame_id=frame_id,
-            timestamp_ns=timestamp_ns or now_ns(),
+            timestamp_ns=received_ns,
         )
-        return _frame_metadata_to_dict(written)
+        finished_ns = now_ns()
+        self._record_ingress_metrics(
+            frame=written,
+            received_ns=received_ns,
+            finished_ns=finished_ns,
+            payload_bytes=len(payload),
+            remote_timestamp_ns=remote_timestamp_ns,
+        )
+        metadata = _frame_metadata_to_dict(written)
+        metadata["remote_timestamp_ns"] = remote_timestamp_ns
+        metadata["http_write_ms"] = (finished_ns - received_ns) / 1_000_000.0
+        self._write_ingress_log(metadata)
+        return metadata
 
     def latest_frame(self) -> SharedMemoryFrame | None:
         """Возвращает последний кадр, даже если он уже был прочитан раньше."""
@@ -131,13 +164,27 @@ class SharedMemoryGateway:
 
         frame = self.latest_frame()
         result = self.latest_result()
+        current_ns = now_ns()
+        frame_payload = _frame_metadata_to_dict(frame) if frame is not None else None
+        result_frame_id = _extract_result_frame_id(result)
+        latest_frame_id = frame.frame_id if frame is not None else 0
         return {
             "prefix": self.config.prefix,
             "camera_id": self.config.camera_id,
             "width": self.config.width,
             "height": self.config.height,
-            "frame": _frame_metadata_to_dict(frame) if frame is not None else None,
+            "frame": frame_payload,
             "result": result,
+            "ingress": self._ingress_metrics(current_ns),
+            "lag": {
+                "latest_frame_id": latest_frame_id,
+                "latest_result_frame_id": result_frame_id,
+                "frame_id_lag": max(0, latest_frame_id - result_frame_id) if result_frame_id is not None else None,
+                "latest_frame_age_ms": (
+                    (current_ns - frame.written_ns) / 1_000_000.0 if frame is not None and frame.written_ns > 0 else None
+                ),
+                "latest_result_age_ms": _result_age_ms(result, current_ns),
+            },
         }
 
     def close(self) -> None:
@@ -148,6 +195,9 @@ class SharedMemoryGateway:
         if self._result_buffer is not None:
             self._result_buffer.close()
             self._result_buffer = None
+        if self._ingress_log_file is not None:
+            self._ingress_log_file.close()
+            self._ingress_log_file = None
 
     def _ensure_result_buffer(self) -> SharedMemoryJsonBuffer | None:
         """Лениво подключается к результатам, которые создаёт runtime."""
@@ -156,6 +206,61 @@ class SharedMemoryGateway:
             return self._result_buffer
         self._result_buffer = SharedMemoryJsonBuffer.try_open(prefix=self.config.prefix, kind="results")
         return self._result_buffer
+
+    def _record_ingress_metrics(
+        self,
+        *,
+        frame: SharedMemoryFrame,
+        received_ns: int,
+        finished_ns: int,
+        payload_bytes: int,
+        remote_timestamp_ns: int | None,
+    ) -> None:
+        """Обновляет статистику приёма сетевых кадров."""
+
+        if self._stats.received_frames == 0:
+            self._stats.first_received_ns = received_ns
+        self._stats.received_frames += 1
+        self._stats.last_received_ns = finished_ns
+        self._stats.last_frame_id = frame.frame_id
+        self._stats.last_payload_bytes = payload_bytes
+        self._stats.last_http_write_ms = (finished_ns - received_ns) / 1_000_000.0
+        self._stats.last_remote_timestamp_ns = remote_timestamp_ns
+        self._recent_frame_times_ns.append(finished_ns)
+
+    def _ingress_metrics(self, current_ns: int) -> dict[str, Any]:
+        """Возвращает статистику входного HTTP-потока."""
+
+        uptime_ms = (
+            (current_ns - self._stats.first_received_ns) / 1_000_000.0
+            if self._stats.first_received_ns > 0
+            else 0.0
+        )
+        if len(self._recent_frame_times_ns) >= 2:
+            recent_span_seconds = max(
+                (self._recent_frame_times_ns[-1] - self._recent_frame_times_ns[0]) / 1_000_000_000.0,
+                1e-6,
+            )
+            recent_fps = (len(self._recent_frame_times_ns) - 1) / recent_span_seconds
+        else:
+            recent_fps = 0.0
+        return {
+            "received_frames": self._stats.received_frames,
+            "recent_fps": recent_fps,
+            "last_frame_id": self._stats.last_frame_id,
+            "last_payload_bytes": self._stats.last_payload_bytes,
+            "last_http_write_ms": self._stats.last_http_write_ms,
+            "last_remote_timestamp_ns": self._stats.last_remote_timestamp_ns,
+            "uptime_ms": uptime_ms,
+        }
+
+    def _write_ingress_log(self, metadata: dict[str, Any]) -> None:
+        """Пишет событие входного кадра в JSONL, если лог включён."""
+
+        if self._ingress_log_file is None:
+            return
+        self._ingress_log_file.write(json.dumps({"event": "frame_received", **metadata}, ensure_ascii=False) + "\n")
+        self._ingress_log_file.flush()
 
 
 def create_app(config: GatewayConfig | None = None):
@@ -191,7 +296,7 @@ def create_app(config: GatewayConfig | None = None):
     ) -> JSONResponse:
         payload = await request.body()
         try:
-            metadata = gateway.publish_raw_y8(payload, frame_id=frame_id, timestamp_ns=timestamp_ns)
+            metadata = gateway.publish_raw_y8(payload, frame_id=frame_id, remote_timestamp_ns=timestamp_ns)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return JSONResponse({"ok": True, "frame": metadata})
@@ -259,6 +364,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--height", type=int, default=DEFAULT_FRAME_HEIGHT, help="Высота RAW Y8 кадра.")
     parser.add_argument("--host", default="0.0.0.0", help="Адрес HTTP-сервера.")
     parser.add_argument("--port", type=int, default=8080, help="Порт HTTP-сервера.")
+    parser.add_argument("--ingress-log", default="", help="JSONL лог входящих кадров.")
     return parser
 
 
@@ -273,6 +379,7 @@ def main() -> None:
         height=args.height,
         host=args.host,
         port=args.port,
+        ingress_log_path=args.ingress_log,
     )
     try:
         import uvicorn
@@ -298,6 +405,46 @@ def _frame_metadata_to_dict(frame: SharedMemoryFrame | None) -> dict[str, Any]:
         "format": frame.frame_format,
         "dtype": frame.dtype,
     }
+
+
+def _open_jsonl_log(path: str):
+    """Открывает JSONL-лог, если путь задан."""
+
+    clean_path = path.strip()
+    if not clean_path:
+        return None
+    target = Path(clean_path).expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target.open("a", encoding="utf-8")
+
+
+def _extract_result_frame_id(result: dict[str, Any] | None) -> int | None:
+    """Достаёт frame_id последнего результата, если runtime его уже записал."""
+
+    if not isinstance(result, dict):
+        return None
+    frame_id = result.get("frame_id")
+    if isinstance(frame_id, int):
+        return frame_id
+    try:
+        return int(frame_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _result_age_ms(result: dict[str, Any] | None, current_ns: int) -> float | None:
+    """Считает возраст результата по локальному времени runtime/gateway."""
+
+    if not isinstance(result, dict):
+        return None
+    finished_ns = result.get("runtime_finished_ns")
+    try:
+        finished_ns_int = int(finished_ns)
+    except (TypeError, ValueError):
+        return None
+    if finished_ns_int <= 0:
+        return None
+    return (current_ns - finished_ns_int) / 1_000_000.0
 
 
 def _draw_result_overlay(image: np.ndarray, result: dict[str, Any] | None) -> np.ndarray:
@@ -343,6 +490,9 @@ def _build_dashboard_html() -> str:
     #empty { color: #aaa; font-size: 18px; text-align: center; padding: 24px; }
     aside { border-left: 1px solid #333; padding: 14px; background: #181818; overflow: auto; }
     button { width: 100%; padding: 9px; margin: 0 0 10px; }
+    .metric { display: grid; grid-template-columns: 1fr auto; gap: 8px; border-bottom: 1px solid #2a2a2a; padding: 7px 0; }
+    .metric span:first-child { color: #aaa; }
+    .metric span:last-child { font-weight: 600; text-align: right; }
     pre { white-space: pre-wrap; font-size: 12px; line-height: 1.35; }
   </style>
 </head>
@@ -353,13 +503,42 @@ def _build_dashboard_html() -> str:
   </main>
   <aside>
     <button id="reset">Сбросить трек</button>
+    <section id="summary"></section>
     <pre id="metrics">Ожидание кадров...</pre>
   </aside>
   <script>
     const frame = document.getElementById("frame");
     const empty = document.getElementById("empty");
     const metrics = document.getElementById("metrics");
+    const summary = document.getElementById("summary");
     let hasFrame = false;
+    function valueOrDash(value) {
+      return value === undefined || value === null ? "—" : value;
+    }
+    function numberOrDash(value, digits = 1) {
+      return typeof value === "number" ? value.toFixed(digits) : "—";
+    }
+    function renderSummary(data) {
+      const result = data.result || {};
+      const snapshot = result.snapshot || {};
+      const frameData = data.frame || {};
+      const ingress = data.ingress || {};
+      const lag = data.lag || {};
+      const items = [
+        ["frame_id", valueOrDash(frameData.frame_id)],
+        ["ingress_fps", numberOrDash(ingress.recent_fps, 1)],
+        ["processed_frame", valueOrDash(lag.latest_result_frame_id)],
+        ["frame_id_lag", valueOrDash(lag.frame_id_lag)],
+        ["state", valueOrDash(snapshot.state)],
+        ["track_id", valueOrDash(snapshot.track_id)],
+        ["processing_ms", numberOrDash(result.processing_ms, 2)],
+        ["source_to_result_ms", numberOrDash(result.source_to_result_ms, 2)],
+        ["ingress_to_runtime_ms", numberOrDash(result.ingress_to_runtime_ms, 2)],
+        ["result_age_ms", numberOrDash(lag.latest_result_age_ms, 1)],
+        ["frame_age_ms", numberOrDash(lag.latest_frame_age_ms, 1)],
+      ];
+      summary.innerHTML = items.map(([name, value]) => `<div class="metric"><span>${name}</span><span>${value}</span></div>`).join("");
+    }
     function refreshFrame() {
       if (!hasFrame) return;
       frame.src = "/api/frame/latest.jpg?overlay=true&t=" + Date.now();
@@ -371,6 +550,7 @@ def _build_dashboard_html() -> str:
         hasFrame = Boolean(data.frame);
         frame.style.display = hasFrame ? "block" : "none";
         empty.style.display = hasFrame ? "none" : "block";
+        renderSummary(data);
         metrics.textContent = JSON.stringify(data, null, 2);
         if (hasFrame) refreshFrame();
       } catch (error) {
