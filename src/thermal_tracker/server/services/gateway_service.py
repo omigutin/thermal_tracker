@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from collections import deque
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib import resources
 import json
@@ -39,6 +40,14 @@ from thermal_tracker.core.connections.shared_memory import (
     SharedMemoryJsonBuffer,
 )
 from thermal_tracker.core.connections.shared_memory.protocol import now_ns
+from thermal_tracker.core.config import AVAILABLE_PRESETS, build_preset, get_preset_presentation
+from thermal_tracker.core.scenarios.scenario_factory import PIPELINE_KIND_TO_SCENARIO
+from thermal_tracker.server.services.web_recording import (
+    ContentRect,
+    RecordingFrameMetadata,
+    WebRecordingManager,
+    parse_content_rect,
+)
 
 
 @dataclass
@@ -94,6 +103,7 @@ class SharedMemoryGateway:
         self._stats = GatewayStats()
         self._recent_frame_times_ns: deque[int] = deque(maxlen=120)
         self._ingress_log_file = _open_jsonl_log(config.ingress_log_path)
+        self.recording_manager = WebRecordingManager()
 
     def publish_raw_y8(
         self,
@@ -101,6 +111,8 @@ class SharedMemoryGateway:
         *,
         frame_id: int | None = None,
         remote_timestamp_ns: int | None = None,
+        content_rect: ContentRect | None = None,
+        source: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Публикует сетевой RAW Y8 кадр в Shared Memory."""
 
@@ -126,7 +138,19 @@ class SharedMemoryGateway:
         metadata = _frame_metadata_to_dict(written)
         metadata["remote_timestamp_ns"] = remote_timestamp_ns
         metadata["http_write_ms"] = (finished_ns - received_ns) / 1_000_000.0
+        metadata["content_rect"] = content_rect.as_dict() if content_rect is not None else None
+        metadata["source"] = source or {}
         self._write_ingress_log(metadata)
+        result = self.latest_result()
+        self.recording_manager.write_frame(
+            _draw_result_overlay(written.image, result),
+            RecordingFrameMetadata(
+                frame=metadata,
+                result=result,
+                content_rect=content_rect,
+                source=source or {},
+            ),
+        )
         return metadata
 
     def latest_frame(self) -> SharedMemoryFrame | None:
@@ -199,6 +223,7 @@ class SharedMemoryGateway:
         if self._ingress_log_file is not None:
             self._ingress_log_file.close()
             self._ingress_log_file = None
+        self.recording_manager.stop()
 
     def _ensure_result_buffer(self) -> SharedMemoryJsonBuffer | None:
         """Лениво подключается к результатам, которые создаёт runtime."""
@@ -271,11 +296,15 @@ def create_app(config: GatewayConfig | None = None):
         raise RuntimeError("Для gateway нужен FastAPI: установите зависимости через Poetry.")
 
     gateway = SharedMemoryGateway(config or GatewayConfig())
-    app = FastAPI(title="Thermal Tracker Gateway", version="0.1.0")
 
-    @app.on_event("shutdown")
-    def _shutdown() -> None:
-        gateway.close()
+    @asynccontextmanager
+    async def lifespan(_app):
+        try:
+            yield
+        finally:
+            gateway.close()
+
+    app = FastAPI(title="Thermal Tracker Gateway", version="0.1.0", lifespan=lifespan)
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -302,10 +331,31 @@ def create_app(config: GatewayConfig | None = None):
         request: Request,
         frame_id: int | None = Query(default=None),
         timestamp_ns: int | None = Query(default=None),
+        content_x: int | None = Query(default=None),
+        content_y: int | None = Query(default=None),
+        content_width: int | None = Query(default=None),
+        content_height: int | None = Query(default=None),
+        source_width: int | None = Query(default=None),
+        source_height: int | None = Query(default=None),
+        source_name: str = Query(default=""),
+        preset_name: str = Query(default=""),
     ) -> JSONResponse:
         payload = await request.body()
+        content_rect = _content_rect_from_query(content_x, content_y, content_width, content_height)
+        source = {
+            "name": source_name,
+            "width": source_width,
+            "height": source_height,
+            "preset": preset_name,
+        }
         try:
-            metadata = gateway.publish_raw_y8(payload, frame_id=frame_id, remote_timestamp_ns=timestamp_ns)
+            metadata = gateway.publish_raw_y8(
+                payload,
+                frame_id=frame_id,
+                remote_timestamp_ns=timestamp_ns,
+                content_rect=content_rect,
+                source=source,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return JSONResponse({"ok": True, "frame": metadata})
@@ -346,6 +396,47 @@ def create_app(config: GatewayConfig | None = None):
     def metrics() -> dict[str, Any]:
         return gateway.metrics()
 
+    @app.get("/api/presets")
+    def presets() -> dict[str, Any]:
+        """Возвращает список доступных пресетов для web-клиента."""
+
+        preset_items = []
+        for name in AVAILABLE_PRESETS:
+            preset = build_preset(name)
+            presentation = get_preset_presentation(name)
+            preset_items.append(
+                {
+                    "name": name,
+                    "title": presentation.title,
+                    "tooltip": presentation.tooltip,
+                    "description": presentation.description,
+                    "pipeline_kind": preset.pipeline_kind,
+                    "scenario": PIPELINE_KIND_TO_SCENARIO.get(preset.pipeline_kind, "opencv_manual"),
+                    "has_neural": preset.neural is not None,
+                    "model_path": preset.neural.model_path if preset.neural is not None else "",
+                }
+            )
+        return {
+            "presets": preset_items,
+        }
+
+    @app.post("/api/commands/configure")
+    async def configure(request: Request) -> dict[str, Any]:
+        """Передаёт runtime команду сменить сценарий или пресет."""
+
+        data = await request.json()
+        preset_name = str(data.get("preset_name") or data.get("preset") or "").strip()
+        scenario = str(data.get("scenario") or "").strip()
+        command: dict[str, Any] = {"type": "configure", "timestamp_ns": now_ns()}
+        if preset_name:
+            command["preset_name"] = preset_name
+        if scenario:
+            command["scenario"] = scenario
+        model_path = str(data.get("model_path") or "").strip()
+        if model_path:
+            command["model_path"] = model_path
+        return gateway.write_command(command)
+
     @app.post("/api/commands/click")
     async def click(request: Request) -> dict[str, Any]:
         data = await request.json()
@@ -359,6 +450,35 @@ def create_app(config: GatewayConfig | None = None):
     @app.post("/api/commands/reset")
     def reset() -> dict[str, Any]:
         return gateway.write_command({"type": "reset", "timestamp_ns": now_ns()})
+
+    @app.post("/api/recording/start")
+    async def start_recording(request: Request) -> dict[str, Any]:
+        """Включает серверную запись видео и JSONL."""
+
+        data = await request.json()
+        content_rect = parse_content_rect(data.get("content_rect"))
+        frame_size = (
+            (content_rect.width, content_rect.height)
+            if content_rect is not None
+            else (gateway.config.width, gateway.config.height)
+        )
+        return gateway.recording_manager.start(
+            base_name=str(data.get("base_name") or "thermal_tracker_recording"),
+            fps=float(data.get("fps") or 25.0),
+            frame_size=frame_size,
+        )
+
+    @app.post("/api/recording/stop")
+    def stop_recording() -> dict[str, Any]:
+        """Останавливает серверную запись."""
+
+        return gateway.recording_manager.stop()
+
+    @app.get("/api/recording/status")
+    def recording_status() -> dict[str, Any]:
+        """Возвращает состояние серверной записи."""
+
+        return gateway.recording_manager.status()
 
     return app
 
@@ -385,7 +505,13 @@ def run_gateway(config: GatewayConfig) -> None:
     except ImportError as exc:
         raise RuntimeError("Для запуска gateway нужен uvicorn: установите зависимости через Poetry.") from exc
 
-    uvicorn.run(create_app(config), host=config.host, port=config.port)
+    uvicorn.run(
+        create_app(config),
+        host=config.host,
+        port=config.port,
+        log_level="warning",
+        access_log=False,
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -468,31 +594,57 @@ def _read_web_asset(name: str) -> str:
     return resources.files("thermal_tracker.client.web").joinpath(name).read_text(encoding="utf-8")
 
 
+def _content_rect_from_query(
+    x: int | None,
+    y: int | None,
+    width: int | None,
+    height: int | None,
+) -> ContentRect | None:
+    """Собирает область реального кадра из query-параметров."""
+
+    if x is None or y is None or width is None or height is None:
+        return None
+    return ContentRect(x=int(x), y=int(y), width=int(width), height=int(height))
+
+
 def _draw_result_overlay(image: np.ndarray, result: dict[str, Any] | None) -> np.ndarray:
-    """Рисует bbox результата поверх grayscale-кадра для браузера."""
+    """Рисует результат трекера поверх grayscale-кадра для браузера."""
 
     canvas = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR) if image.ndim == 2 else image.copy()
     if not isinstance(result, dict):
         return canvas
 
     snapshot = result.get("snapshot")
-    bbox = snapshot.get("bbox") if isinstance(snapshot, dict) else None
-    if not isinstance(bbox, dict):
+    if not isinstance(snapshot, dict):
         return canvas
 
+    if snapshot.get("state") == "SEARCHING":
+        _draw_bbox(canvas, snapshot.get("search_region"), (0, 190, 255))
+        _draw_bbox(canvas, snapshot.get("predicted_bbox"), (255, 220, 0))
+    target_bbox = _draw_bbox(canvas, snapshot.get("bbox"), (0, 255, 0))
+    track_id = snapshot.get("track_id") if isinstance(snapshot, dict) else None
+    if track_id is not None and target_bbox is not None:
+        x, y, _, _ = target_bbox
+        cv2.putText(canvas, f"#{track_id}", (x, max(0, y - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 0), 1)
+    return canvas
+
+
+def _draw_bbox(canvas: np.ndarray, bbox: Any, color: tuple[int, int, int]) -> tuple[int, int, int, int] | None:
+    """Рисует прямоугольник из словаря bbox и возвращает его координаты."""
+
+    if not isinstance(bbox, dict):
+        return None
     try:
         x = int(bbox["x"])
         y = int(bbox["y"])
         width = int(bbox["width"])
         height = int(bbox["height"])
     except (KeyError, TypeError, ValueError):
-        return canvas
-
-    cv2.rectangle(canvas, (x, y), (x + width, y + height), (0, 255, 0), 1)
-    track_id = snapshot.get("track_id") if isinstance(snapshot, dict) else None
-    if track_id is not None:
-        cv2.putText(canvas, f"#{track_id}", (x, max(0, y - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 0), 1)
-    return canvas
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    cv2.rectangle(canvas, (x, y), (x + width, y + height), color, 1)
+    return x, y, width, height
 
 
 

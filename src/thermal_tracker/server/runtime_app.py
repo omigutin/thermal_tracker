@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import time
 
-from thermal_tracker.core.config import RuntimeConfig, load_app_config
+from thermal_tracker.core.config import RuntimeConfig, TrackerPreset, build_preset, load_app_config
 from thermal_tracker.core.connections.commands import create_command_reader
 from thermal_tracker.core.connections.frames import create_frame_reader
 from thermal_tracker.core.connections.results import create_result_writer
@@ -13,6 +13,7 @@ from thermal_tracker.core.connections.shared_memory import SharedMemoryFrame
 from thermal_tracker.core.connections.shared_memory.protocol import now_ns
 from thermal_tracker.core.domain.models import BoundingBox, GlobalMotion, TrackSnapshot
 from thermal_tracker.core.domain.runtime import ScenarioStepResult, SessionRuntimeState
+from thermal_tracker.core.scenarios import default_preset_for_scenario
 from thermal_tracker.core.storage import create_history_store
 
 
@@ -26,13 +27,21 @@ class RuntimeApp:
     result_writer: object
     history_store: object
     runtime_state: SessionRuntimeState = field(default_factory=SessionRuntimeState)
+    preset_name_override: str | None = None
+    neural_model_path_override: str | None = None
+    queued_runtime_command: object | None = None
 
     def initialize_scenario(self) -> object:
         if self.scenario is None:
             from thermal_tracker.core.scenarios import ScenarioFactory
 
-            preset_name = self.config.app.preset or None
-            self.scenario = ScenarioFactory.create(self.scenario_name, preset_name=preset_name)
+            preset_name = self.preset_name_override or self.config.app.preset or None
+            preset_override = self._build_preset_override(preset_name) if self.neural_model_path_override else None
+            self.scenario = ScenarioFactory.create(
+                self.scenario_name,
+                preset_name=preset_name,
+                preset_override=preset_override,
+            )
         return self.scenario
 
     def close(self) -> None:
@@ -44,10 +53,16 @@ class RuntimeApp:
     def process_once(self) -> dict[str, object] | None:
         """Обрабатывает один новый кадр из подключенного источника."""
 
-        self._apply_runtime_command(self._read_command())
+        command = self._read_command()
+        if command is not None:
+            self.queued_runtime_command = command
+
         ok, raw_frame = self.frame_reader.read()
         if not ok or raw_frame is None:
             return None
+
+        self._apply_runtime_command(self.queued_runtime_command)
+        self.queued_runtime_command = None
 
         scenario = self.initialize_scenario()
         frame_metadata = getattr(self.frame_reader, "last_frame", None)
@@ -98,6 +113,36 @@ class RuntimeApp:
 
         if command_type in {"reset", "clear"}:
             self.runtime_state.reset_requested = True
+            return
+
+        if command_type in {"configure", "set_preset"}:
+            scenario = str(command.get("scenario") or "").strip()
+            preset_name = str(command.get("preset_name") or command.get("preset") or "").strip()
+            model_path = str(command.get("model_path") or "").strip()
+            if scenario:
+                self.scenario_name = scenario
+            if preset_name:
+                self.preset_name_override = preset_name
+            elif scenario:
+                self.preset_name_override = default_preset_for_scenario(scenario)
+            self.neural_model_path_override = model_path or None
+            self.scenario = None
+            self.runtime_state = SessionRuntimeState()
+
+    def _build_preset_override(self, preset_name: str | None) -> TrackerPreset | None:
+        """Собирает пресет с переопределённым путём модели для NN-сценария."""
+
+        if not preset_name or not self.neural_model_path_override:
+            return None
+
+        preset = build_preset(preset_name)
+        if preset.neural is None:
+            return None
+
+        return replace(
+            preset,
+            neural=replace(preset.neural, model_path=self.neural_model_path_override),
+        )
 
     def _build_result_payload(
         self,

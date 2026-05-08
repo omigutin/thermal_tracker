@@ -27,6 +27,12 @@ class TargetSelectorManager:
 
         return self._selector
 
+    @property
+    def config(self) -> ClickSelectionConfig:
+        """Возвращает конфиг выбранного метода инициализации цели."""
+
+        return self._selector.config
+
     def select(
         self,
         frame: ProcessedFrame,
@@ -36,6 +42,9 @@ class TargetSelectorManager:
         """Находит цель вокруг точки клика."""
 
         return self._selector.select(frame, point, expected_bbox)
+
+    def __getattr__(self, name: str):
+        return getattr(self._selector, name)
 
     @classmethod
     def _build_selector(

@@ -1,12 +1,12 @@
-"""Менеджер выбора метода стабилизации кадра."""
+""" Менеджер выбора метода стабилизации кадра. """
 
 from __future__ import annotations
 
+from .no_stabilizer import NoMotionEstimator
 from ...config import GlobalMotionConfig
 from ...domain.models import GlobalMotion, ProcessedFrame
 from .base_stabilizer import BaseMotionEstimator
 from .frame_stabilizer_type import FrameStabilizerType
-from .no_stabilizer import NoMotionEstimator
 from .opencv_feature_affine_stabilizer import FeatureAffineMotionEstimator
 from .opencv_phase_correlation_stabilizer import PhaseCorrelationMotionEstimator
 
@@ -18,7 +18,7 @@ class FrameStabilizerManager:
     """Создаёт и запускает выбранный оценщик движения камеры."""
 
     def __init__(self, stabilizer: FrameStabilizerInput, config: GlobalMotionConfig) -> None:
-        self._estimator = self._build_estimator(stabilizer, config)
+        self._estimator: BaseMotionEstimator = self._build_estimator(stabilizer, config)
 
     @property
     def estimator(self) -> BaseMotionEstimator:
@@ -39,6 +39,7 @@ class FrameStabilizerManager:
     ) -> BaseMotionEstimator:
         if not config.enabled:
             return NoMotionEstimator()
+
         stabilizer_type = cls._normalize_stabilizer_type(stabilizer)
         if stabilizer_type == FrameStabilizerType.NO:
             return NoMotionEstimator()

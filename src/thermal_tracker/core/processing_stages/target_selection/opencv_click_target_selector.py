@@ -233,6 +233,14 @@ class ClickTargetSelector(BaseClickInitializer):
             return selection
         if expanded_height > int(selection.bbox.height * allowed_side_ratio):
             return selection
+        expanded_aspect = max(
+            expanded_width / max(float(expanded_height), 1.0),
+            expanded_height / max(float(expanded_width), 1.0),
+        )
+        small_target_mode = self.config.fallback_size <= 18 and self.config.max_expansion_ratio <= 2.5
+        expected_size = max(self.config.fallback_size, self.config.min_component_area)
+        if small_target_mode and expanded_aspect >= 1.85 and expanded_width >= expected_size * 2.35:
+            return selection
 
         expanded_bbox = BoundingBox(
             x=patch.origin_x + work_bbox.x + x - self.config.padding,
@@ -322,6 +330,19 @@ class ClickTargetSelector(BaseClickInitializer):
         if contrast < self.config.min_object_contrast:
             return None
 
+        compact_selection = self._compact_selection_for_elongated_component(
+            patch,
+            bbox,
+            area,
+            patch.local_x,
+            patch.local_y,
+            hot_object,
+            polarity,
+            frame_shape,
+        )
+        if compact_selection is not None:
+            return compact_selection
+
         result_bbox = BoundingBox(
             x=patch.origin_x + bbox.x - self.config.padding,
             y=patch.origin_y + bbox.y - self.config.padding,
@@ -330,6 +351,55 @@ class ClickTargetSelector(BaseClickInitializer):
         ).clamp(frame_shape)
         confidence = max(0.1, min(1.0, area / max(self.config.min_component_area, 1)))
         return SelectionResult(bbox=result_bbox, confidence=confidence, polarity=polarity)
+
+    def _compact_selection_for_elongated_component(
+        self,
+        patch: LocalPatch,
+        bbox: BoundingBox,
+        area: int,
+        click_x: int,
+        click_y: int,
+        hot_object: bool,
+        polarity: str,
+        frame_shape: tuple[int, int] | tuple[int, int, int],
+    ) -> SelectionResult | None:
+        """Не даёт маленькой цели расползаться по длинной яркой линии."""
+
+        if not self._component_is_oversized_for_small_target(bbox, area):
+            return None
+
+        radius = max(5, min(14, self.config.fallback_size))
+        x1 = max(0, click_x - radius)
+        y1 = max(0, click_y - radius)
+        x2 = min(patch.image.shape[1], click_x + radius + 1)
+        y2 = min(patch.image.shape[0], click_y + radius + 1)
+        local = patch.image[y1:y2, x1:x2]
+        if local.size == 0:
+            return None
+
+        blurred = cv2.GaussianBlur(local, (3, 3), 0)
+        local_median = float(np.median(blurred))
+        if hot_object:
+            score = blurred.astype(np.float32) - local_median
+        else:
+            score = local_median - blurred.astype(np.float32)
+
+        best_y, best_x = np.unravel_index(int(np.argmax(score)), score.shape)
+        if float(score[best_y, best_x]) < self.config.min_object_contrast:
+            center_x = click_x
+            center_y = click_y
+        else:
+            center_x = x1 + int(best_x)
+            center_y = y1 + int(best_y)
+
+        size = max(self.config.fallback_size, self.config.min_component_area)
+        compact_bbox = BoundingBox.from_center(
+            patch.origin_x + center_x,
+            patch.origin_y + center_y,
+            size,
+            size,
+        ).clamp(frame_shape)
+        return SelectionResult(bbox=compact_bbox, confidence=0.45, polarity=polarity)
 
     def _split_contrast_cluster(
         self,
@@ -578,6 +648,9 @@ class ClickTargetSelector(BaseClickInitializer):
         if expected_bbox is None:
             if w > max_patch_width or h > max_patch_height:
                 return None, 0.0
+            compact_bbox = self._compact_local_bbox_for_large_component(patch, BoundingBox(x, y, w, h), area)
+            if compact_bbox is not None:
+                return compact_bbox, 0.45
         else:
             if w > int(expected_bbox.width * self.config.max_refine_growth):
                 return None, 0.0
@@ -593,6 +666,46 @@ class ClickTargetSelector(BaseClickInitializer):
 
         confidence = max(0.1, min(1.0, area / max(self.config.min_component_area, 1)))
         return bbox, confidence
+
+    def _compact_local_bbox_for_large_component(
+        self,
+        patch: LocalPatch,
+        bbox: BoundingBox,
+        area: int,
+    ) -> BoundingBox | None:
+        """Возвращает компактный bbox, если компонент похож на длинную линию."""
+
+        if not self._component_is_oversized_for_small_target(bbox, area):
+            return None
+
+        size = max(self.config.fallback_size, self.config.min_component_area)
+        local_x = int(np.clip(patch.local_x - size // 2, 0, max(0, patch.image.shape[1] - size)))
+        local_y = int(np.clip(patch.local_y - size // 2, 0, max(0, patch.image.shape[0] - size)))
+        return BoundingBox(
+            x=patch.origin_x + local_x,
+            y=patch.origin_y + local_y,
+            width=size,
+            height=size,
+        )
+
+    def _component_is_oversized_for_small_target(self, bbox: BoundingBox, area: int) -> bool:
+        """Проверяет, что компонент слишком большой для пресета маленькой цели."""
+
+        small_target_mode = self.config.fallback_size <= 18 and self.config.max_expansion_ratio <= 2.5
+        if not small_target_mode:
+            return False
+
+        expected_size = max(self.config.fallback_size, self.config.min_component_area)
+        bbox_aspect = max(
+            bbox.width / max(float(bbox.height), 1.0),
+            bbox.height / max(float(bbox.width), 1.0),
+        )
+        oversized_side = bbox.width >= expected_size * 2.0 or bbox.height >= expected_size * 2.0
+        oversized_area = bbox.area >= expected_size * expected_size * 4
+        elongated = bbox_aspect >= 1.75
+        long_line = bbox.width >= self.config.search_radius * 0.75
+
+        return (oversized_side and (oversized_area or elongated)) or long_line or area >= max(expected_size * 24, 260)
 
     def _split_large_component(
         self,

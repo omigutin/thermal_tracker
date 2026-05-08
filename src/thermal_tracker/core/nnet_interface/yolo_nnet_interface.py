@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import cv2
 import numpy as np
 from ultralytics import YOLO
 
@@ -25,6 +26,16 @@ def _resolve_path(raw_path: str) -> str:
     if candidate.is_absolute():
         return str(candidate)
     return str((PROJECT_ROOT / candidate).resolve())
+
+
+def _ensure_three_channel_frame(frame: np.ndarray) -> np.ndarray:
+    """Приводит кадр к 3-канальному виду, который ожидает YOLO."""
+
+    if frame.ndim == 2:
+        return cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    if frame.ndim == 3 and frame.shape[2] == 1:
+        return cv2.cvtColor(frame[:, :, 0], cv2.COLOR_GRAY2BGR)
+    return frame
 
 
 class YoloNnetInterface(BaseNnetInterface):
@@ -47,7 +58,8 @@ class YoloNnetInterface(BaseNnetInterface):
     def track(self, frame: np.ndarray) -> list[DetectedObject]:
         """Запускает модель и возвращает детекции в доменных структурах."""
 
-        results = self._run_model(frame)
+        model_frame = _ensure_three_channel_frame(frame)
+        results = self._run_model(model_frame)
         if not results:
             return []
 
@@ -70,7 +82,7 @@ class YoloNnetInterface(BaseNnetInterface):
                 y=min(y1, y2),
                 width=max(1, abs(x2 - x1)),
                 height=max(1, abs(y2 - y1)),
-            ).clamp(frame.shape)
+            ).clamp(model_frame.shape)
             class_id = int(class_ids[index]) if index < len(class_ids) else -1
             track_id = (
                 int(track_ids[index])

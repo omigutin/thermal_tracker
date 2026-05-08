@@ -840,12 +840,19 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
 
         if score >= self.config.template_update_threshold:
             if self._state == TrackerState.SEARCHING:
-                growth = 0.03 * min(self._lost_frames, 20)
                 if self._blur_hold_active():
-                    growth += self.config.blur_hold_center_growth * min(self._lost_frames, 30)
+                    allowed_error = max(
+                        12.0,
+                        max_dimension * (1.35 + 0.03 * min(self._lost_frames, 10)),
+                    )
+                    if center_error > allowed_error:
+                        strong_score = self.config.template_update_threshold + 0.18
+                        strong_error = max(18.0, max_dimension * 1.9)
+                        return score >= strong_score and center_error <= strong_error
+                    return True
+
+                growth = 0.03 * min(self._lost_frames, 20)
                 allowed_error = max(10.0, max_dimension * (1.45 + growth))
-                if self._blur_hold_active() and center_error > max(14.0, max_dimension * 2.4):
-                    return score >= self.config.template_update_threshold + 0.10 and center_error <= allowed_error
                 return center_error <= allowed_error
             return True
 

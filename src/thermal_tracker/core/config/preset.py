@@ -31,8 +31,8 @@ class PreprocessingConfig:
 @dataclass
 class GlobalMotionConfig:
     """Параметры грубой оценки движения камеры."""
-    method: str = "opencv_phase_correlation"  # Какой метод стабилизации выбрать через FrameStabilizerManager.
     enabled: bool = True  # Включать ли оценку глобального сдвига камеры.
+    method: str = "opencv_phase_correlation"  # Какой метод стабилизации выбрать через FrameStabilizerManager.
     downscale: float = 0.5  # Во сколько раз уменьшать кадр перед фазовой корреляцией.
     blur_kernel: int = 9  # Размер сглаживания перед оценкой общего движения.
     min_response: float = 0.03  # Минимальная надёжность ответа phase correlation.

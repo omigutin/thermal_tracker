@@ -3,19 +3,109 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Thermal Tracker Gateway</title>
-  <link rel="stylesheet" href="/web/styles.css">
+  <title>Thermal Tracker Web Client</title>
+  <link rel="stylesheet" href="/web/styles.css?v=20260508f">
 </head>
 <body>
-  <main>
-    <div id="empty">Кадров пока нет. Запустите отправитель видео в gateway.</div>
-    <img id="frame" alt="Последний кадр" hidden>
+  <section class="sidebar source-panel" aria-label="Источник и режим">
+    <div class="panel-block">
+      <h2>Источник</h2>
+      <div class="button-row">
+        <label class="file-button">
+          Файлы
+          <input id="filePicker" type="file" accept="video/*" multiple>
+        </label>
+        <label class="file-button">
+          Папка
+          <input id="folderPicker" type="file" accept="video/*" multiple webkitdirectory>
+        </label>
+      </div>
+      <div id="playlistStatus" class="muted">Видео не выбраны.</div>
+    </div>
+
+    <div class="panel-block mode-block">
+      <h2>Режим</h2>
+      <label class="field">
+        <span>Пресет</span>
+        <select id="presetSelect"></select>
+      </label>
+      <label id="modelPathField" class="field" hidden>
+        <span>Модель YOLO</span>
+        <div class="inline-field">
+          <input id="modelPathInput" type="text" placeholder="models/model.pt">
+          <button id="chooseModel" type="button">Выбрать</button>
+        </div>
+      </label>
+      <label class="field">
+        <span>Интервал кадров, мс</span>
+        <input id="frameInterval" type="number" min="5" max="1000" step="1" value="40">
+      </label>
+      <label class="check-row">
+        <input id="sequentialPlayback" type="checkbox">
+        <span>Воспроизводить плейлист подряд</span>
+      </label>
+      <label class="check-row">
+        <input id="recordOutput" type="checkbox">
+        <span>Записывать просмотр в браузере</span>
+      </label>
+      <a id="recordDownload" class="record-link" hidden>Скачать запись</a>
+    </div>
+
+    <div class="panel-block playlist-block">
+      <h2>Плейлист</h2>
+      <ul id="playlist" class="playlist"></ul>
+    </div>
+  </section>
+
+  <main class="viewer-panel">
+    <div class="top-controls controls">
+      <div class="transport-row">
+        <button id="previousVideo" type="button" title="Предыдущее видео">⏮</button>
+        <button id="stepBack" type="button" title="Назад на кадр">◀</button>
+        <button id="playPause" type="button" title="Пауза / воспроизведение">▶</button>
+        <button id="stopVideo" type="button" title="Стоп">■</button>
+        <button id="stepForward" type="button" title="Вперёд на кадр">▶</button>
+        <button id="nextVideo" type="button" title="Следующее видео">⏭</button>
+      </div>
+      <input id="timeline" type="range" min="0" max="0" value="0" step="0.001">
+      <div class="time-row">
+        <span id="timeLabel">00:00 / 00:00</span>
+        <span id="sendStatus">кадров: 0</span>
+      </div>
+    </div>
+    <div class="video-stage">
+      <canvas id="displayCanvas" width="512" height="640"></canvas>
+      <div id="emptyOverlay">Выберите видео и нажмите воспроизведение.</div>
+    </div>
+    <video id="sourceVideo" muted playsinline preload="metadata" hidden></video>
   </main>
-  <aside>
-    <button id="reset" type="button">Сбросить трек</button>
-    <section id="summary"></section>
-    <pre id="metrics">Ожидание кадров...</pre>
-  </aside>
-  <script src="/web/app.js"></script>
+
+  <section class="sidebar info-panel" aria-label="Управление и техническая информация">
+    <div class="panel-block">
+      <h2>Техническая информация</h2>
+      <div id="summary" class="summary"></div>
+      <pre id="metrics">Ожидание сервера...</pre>
+    </div>
+  </section>
+
+  <div id="modelDialog" class="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modelDialogTitle">
+      <h2 id="modelDialogTitle">Выбор модели YOLO</h2>
+      <label class="field">
+        <span>Путь на сервере</span>
+        <input id="dialogModelPath" type="text" placeholder="models/model.pt">
+      </label>
+      <label class="file-button model-file-button">
+        Файл
+        <input id="modelFilePicker" type="file" accept=".pt,.onnx,.engine,.xml,.bin">
+      </label>
+      <div class="modal-actions">
+        <button id="cancelModelDialog" type="button">Отмена</button>
+        <button id="applyModelDialog" type="button">Применить</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="/web/app.js?v=20260508f"></script>
 </body>
 </html>
