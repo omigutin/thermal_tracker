@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TypeAlias
 
-from ...config import TargetRecoveryConfig
+from ...config.preset import TargetRecoveryConfig
 from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame
 from .base_target_recoverer import BaseReacquirer
 from .candidate_based_target_recoverer import CandidateBasedReacquirer
