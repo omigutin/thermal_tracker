@@ -26,7 +26,7 @@ class ManualClickNeuralPipeline:
         if self.preset.neural is None:
             raise RuntimeError(f"Пресет {preset_name!r} не содержит секцию [neural].")
 
-        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.method, self.preset.preprocessing)
+        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.tracker = TargetTrackerManager(
             self.preset.tracker.method,

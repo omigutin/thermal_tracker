@@ -1,10 +1,9 @@
-"""
-    Типы препроцессоров кадра.
-    Модуль содержит enum со всеми препроцессорами,
-    которые могут использоваться на стадии предварительной обработки кадра.
-    Enum применяется в конфигурациях и пресетах:
-    внешний код может передать тип препроцессора в FramePreprocessorManager,
-    а менеджер преобразует его в готовый экземпляр соответствующего препроцессора.
+"""Типы атомарных операций предобработки кадра.
+
+Модуль содержит enum со всеми атомарными операциями, которые можно
+включать в стадию preprocessing. Enum применяется в конфигурациях и
+пресетах: внешний код передаёт список значений в FramePreprocessorManager,
+а менеджер по каждому значению создаёт соответствующую операцию.
 """
 
 from __future__ import annotations
@@ -13,14 +12,14 @@ from enum import StrEnum
 
 
 class FramePreprocessorType(StrEnum):
-    """ Доступные типы препроцессоров кадра. """
+    """Доступные атомарные операции на стадии предобработки кадра."""
 
-    IDENTITY = "identity"  # Возвращает кадр без смысловой обработки, только в общем формате ProcessedFrame.
-    THERMAL = "thermal"  # Базовая тепловизионная подготовка: grayscale, нормализация, сглаживание, градиент.
-    BILATERAL = "bilateral"  # Подавляет шум, стараясь сохранить границы объектов.
-    CLAHE_CONTRAST = "clahe_contrast"  # Усиливает локальный контраст через CLAHE.
-    PERCENTILE_NORMALIZE = "percentile_normalize"  # Нормализует яркость по процентилям, отрезая выбросы.
-
-    # AGC_COMPENSATION = "agc_compensation"  # Компенсация авто-подстройки яркости тепловизора.
-    # GRADIENT_ENHANCED = "gradient_enhanced"  # Подчёркивание границ и мелких контрастных деталей.
-    # TEMPORAL_DENOISE = "temporal_denoise"  # Подавление шума с учетом соседних кадров.
+    RESIZE = "resize"  # Уменьшает размер всех каналов до заданной ширины с сохранением пропорций.
+    GAUSSIAN_BLUR = "gaussian_blur"  # Сглаживает gray гауссовым фильтром.
+    MEDIAN_BLUR = "median_blur"  # Сглаживает gray медианным фильтром.
+    BILATERAL = "bilateral"  # Сглаживает gray bilateral-фильтром, сохраняя границы объектов.
+    NORMALIZE_MINMAX = "normalize_minmax"  # Линейная нормализация gray -> normalized.
+    CLAHE_CONTRAST = "clahe_contrast"  # Усиливает локальный контраст в normalized через CLAHE.
+    PERCENTILE_NORMALIZE = "percentile_normalize"  # Перцентильная нормализация gray -> normalized.
+    GRADIENT = "gradient"  # Считает карту градиентов из normalized в gradient.
+    SHARPNESS_METRIC = "sharpness_metric"  # Заполняет ProcessedFrame.quality.sharpness.

@@ -22,7 +22,7 @@ class ManualClickTrackingPipeline:
 
     def __init__(self, preset_name: str, preset_override: TrackerPreset | None = None) -> None:
         self.preset: TrackerPreset = preset_override or build_preset(preset_name)
-        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.method, self.preset.preprocessing)
+        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.tracker = TargetTrackerManager(
             self.preset.tracker.method,

@@ -31,7 +31,7 @@ class AutoMotionTrackingPipeline:
 
     def __init__(self, preset_name: str) -> None:
         self.preset: TrackerPreset = build_preset(preset_name)
-        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.method, self.preset.preprocessing)
+        self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.motion_detector = MovingAreaDetectorManager(self.preset.moving_area_detection.method)
         self.object_builder = TargetCandidateExtractorManager(self.preset.target_candidate_extraction.method)

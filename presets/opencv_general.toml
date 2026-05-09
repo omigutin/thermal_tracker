@@ -32,7 +32,16 @@ method = "opencv_connected_components"
 method = "local_template"
 
 [preprocessing]
-method = "thermal"
+# Последовательность атомарных операций предобработки кадра.
+methods = [
+    "resize",
+    "gaussian_blur",
+    "median_blur",
+    "normalize_minmax",
+    "clahe_contrast",
+    "gradient",
+    "sharpness_metric",
+]
 # Если кадр слишком широкий, уменьшаем его до этой ширины перед обработкой.
 resize_width = 960
 # Размер гауссова размытия для мягкого подавления обычного шума.

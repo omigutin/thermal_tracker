@@ -48,6 +48,10 @@ def _format_state_name(state: TrackerState) -> str:
         return "Сопровождение"
     if state == TrackerState.SEARCHING:
         return "Повторный поиск"
+    if state == TrackerState.RECOVERING:
+        return "Восстановление"
+    if state == TrackerState.LOST:
+        return "Цель потеряна"
     return state.value
 
 

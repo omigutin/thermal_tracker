@@ -18,14 +18,33 @@ PRESETS_DIR = PROJECT_ROOT / "presets"
 
 @dataclass
 class PreprocessingConfig:
-    """Параметры базовой подготовки кадра."""
-    method: str = "thermal"  # Какой препроцессор кадра выбрать через FramePreprocessorManager.
-    resize_width: int | None = 960  # Если кадр слишком широкий, уменьшаем его до этой ширины.
-    gaussian_kernel: int = 5  # Размер ядра мягкого гауссова сглаживания.
-    median_kernel: int = 3  # Размер ядра медианного фильтра против одиночного шума.
-    clahe_clip_limit: float = 2.0  # Насколько агрессивно усиливаем локальный контраст.
-    clahe_tile_grid_size: int = 8  # На сколько плиток делим кадр для CLAHE.
-    gradient_blur_kernel: int = 3  # Дополнительное сглаживание перед расчётом градиентов.
+    """Параметры стадии preprocessing.
+
+    `methods` задаёт последовательность атомарных операций. Параметры ниже
+    шарятся между операциями: каждая операция при сборке менеджером забирает
+    из этого dataclass только нужные ей поля.
+    """
+
+    methods: tuple[str, ...] = (
+        "resize",
+        "gaussian_blur",
+        "median_blur",
+        "normalize_minmax",
+        "clahe_contrast",
+        "gradient",
+        "sharpness_metric",
+    )
+    resize_width: int | None = 960  # Целевая ширина для операции `resize`.
+    gaussian_kernel: int = 5  # Размер ядра для `gaussian_blur`.
+    median_kernel: int = 3  # Размер ядра для `median_blur`.
+    clahe_clip_limit: float = 2.0  # Параметр clipLimit для `clahe_contrast`.
+    clahe_tile_grid_size: int = 8  # Размер сетки тайлов для `clahe_contrast`.
+    gradient_blur_kernel: int = 3  # Сглаживание перед Sobel в `gradient`.
+    bilateral_diameter: int = 7  # Диаметр окрестности для `bilateral`.
+    bilateral_sigma_color: float = 40.0  # sigmaColor для `bilateral`.
+    bilateral_sigma_space: float = 40.0  # sigmaSpace для `bilateral`.
+    percentile_low: float = 2.0  # Нижний перцентиль для `percentile_normalize`.
+    percentile_high: float = 98.0  # Верхний перцентиль для `percentile_normalize`.
 
 
 @dataclass
@@ -224,6 +243,19 @@ def _normalize_candidate_filtering_section(section: dict[str, object]) -> dict[s
     return normalized
 
 
+def _normalize_preprocessing_section(section: dict[str, object]) -> dict[str, object]:
+    """Подготавливает список атомарных операций preprocessing перед созданием dataclass."""
+
+    normalized = dict(section)
+    methods = normalized.get("methods")
+    if methods is not None:
+        if isinstance(methods, str):
+            normalized["methods"] = (methods,)
+        else:
+            normalized["methods"] = tuple(str(value) for value in methods)
+    return normalized
+
+
 def _build_presentation(preset_name: str, meta: dict[str, object]) -> PresetPresentation:
     """Собирает описание пресета для интерфейса."""
     title = str(meta.get("title") or preset_name)
@@ -249,7 +281,9 @@ def _build_preset_record(path: Path) -> _PresetRecord:
     if not preset_name:
         raise RuntimeError(f"В пресете {path} не задано имя.")
 
-    preprocessing = PreprocessingConfig(**dict(data.get("preprocessing", {})))
+    preprocessing = PreprocessingConfig(
+        **_normalize_preprocessing_section(dict(data.get("preprocessing", {})))
+    )
     global_motion = GlobalMotionConfig(**dict(data.get("global_motion", {})))
     moving_area_detection = MovingAreaDetectionConfig(**dict(data.get("moving_area_detection", {})))
     target_candidate_extraction = TargetCandidateExtractionConfig(

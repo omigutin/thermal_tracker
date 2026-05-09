@@ -9,11 +9,24 @@ import numpy as np
 
 
 class TrackerState(str, Enum):
-    """Короткий список состояний выбранной цели."""
+    """Состояния жизненного цикла одной отслеживаемой цели.
+
+    - IDLE       — цель не выбрана. Стартовое состояние и состояние после полного сброса.
+    - TRACKING   — цель уверенно сопровождается. Модель движения обновляется обычным путём.
+    - SEARCHING  — цель временно потеряна. Модель движения только предсказывает прогноз
+                   и не обновляется, пока не появится подтверждённый кандидат.
+    - RECOVERING — найден кандидат на восстановление цели, но он ещё не подтверждён историей.
+                   Модель движения не обновляется до подтверждения, чтобы плохой кандидат
+                   не испортил траекторию.
+    - LOST       — цель окончательно потеряна. Модель движения недостоверна. Дальше нужен
+                   новый клик пользователя или внешний сброс.
+    """
 
     IDLE = "IDLE"
     TRACKING = "TRACKING"
     SEARCHING = "SEARCHING"
+    RECOVERING = "RECOVERING"
+    LOST = "LOST"
 
 
 @dataclass(frozen=True)
@@ -84,6 +97,18 @@ class BoundingBox:
 
 
 @dataclass
+class FrameQuality:
+    """Метрики качества одного кадра, заполняемые атомарными операциями preprocessing.
+
+    sharpness — оценка резкости центральной части кадра (Laplacian-метрика).
+    blurred   — флаг, что резкость существенно ниже базовой.
+    """
+
+    sharpness: float = 0.0
+    blurred: bool = False
+
+
+@dataclass
 class ProcessedFrame:
     """Кадр после предобработки."""
 
@@ -91,6 +116,7 @@ class ProcessedFrame:
     gray: np.ndarray
     normalized: np.ndarray
     gradient: np.ndarray
+    quality: FrameQuality | None = None
 
 
 @dataclass

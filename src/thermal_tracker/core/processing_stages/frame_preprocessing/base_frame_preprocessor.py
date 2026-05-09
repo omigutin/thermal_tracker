@@ -1,27 +1,21 @@
-"""
-    Базовый интерфейс препроцессора кадра.
-    Модуль содержит абстрактный класс для всех препроцессоров, которые преобразуют
-    сырой входной кадр в ProcessedFrame.
-    Каждый препроцессор должен подготовить основные представления кадра:
-        - bgr: кадр для отображения и дальнейшей работы с координатами;
-        - gray: одноканальное представление;
-        - normalized: нормализованное представление яркости;
-        - gradient: карта градиентов или контурной структуры.
+"""Базовый контракт атомарной операции стадии preprocessing.
+
+Каждая реализация изменяет один или несколько каналов :class:`ProcessedFrame`
+(``bgr``, ``gray``, ``normalized``, ``gradient``, ``quality``) и возвращает
+обновлённый кадр. Менеджер последовательно прогоняет ProcessedFrame через
+несколько таких операций.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-import numpy as np
-
 from ...domain.models import ProcessedFrame
 
 
 class BaseFramePreprocessor(ABC):
-    """Базовый интерфейс атомарного препроцессора кадра."""
+    """Атомарная операция предобработки кадра."""
 
     @abstractmethod
-    def process(self, frame: np.ndarray) -> ProcessedFrame:
-        """Преобразовать сырой кадр в подготовленный ProcessedFrame."""
-        pass
+    def process(self, frame: ProcessedFrame) -> ProcessedFrame:
+        """Применить операцию и вернуть обновлённый ProcessedFrame."""
