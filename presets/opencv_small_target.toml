@@ -28,10 +28,30 @@ method = "opencv_mog2"
 method = "opencv_connected_components"
 
 [target_recovery]
+# Какой recoverer выбирает TargetRecovererManager (см. TargetRecovererType).
 method = "local_template"
+# Маленькую цель быстрее теряем — пробуем восстановить раньше.
+min_lost_frames = 3
+# Зона поиска чуть теснее, чтобы не уехать на соседнюю горячую точку.
+search_padding = 40
+# Узкий диапазон масштабов: маленький объект почти не меняет размер за одну потерю.
+scales = [0.9, 1.0, 1.1]
+# Чуть строже порог совпадения, маленькая цель легко даёт ложные срабатывания.
+match_threshold = 0.55
+# Адаптивный шаблон обновляем медленнее, чтобы не учиться на размытом контуре.
+template_alpha = 0.08
 
 [preprocessing]
-method = "thermal"
+# Последовательность атомарных операций предобработки кадра.
+methods = [
+    "resize",
+    "gaussian_blur",
+    "median_blur",
+    "normalize_minmax",
+    "clahe_contrast",
+    "gradient",
+    "sharpness_metric",
+]
 # Если кадр слишком широкий, уменьшаем его до этой ширины перед обработкой.
 resize_width = 960
 # Размер гауссова размытия для мягкого подавления обычного шума.

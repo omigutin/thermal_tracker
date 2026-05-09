@@ -1,4 +1,11 @@
-"""Базовый класс для повторного захвата потерянной цели."""
+"""Базовый контракт стадии повторного захвата потерянной цели.
+
+Recoverer хранит знание о том, как выглядит цель, и пытается вернуть её
+на новом кадре. Минимальный recoverer обязан реализовать только
+:meth:`reacquire`. Методы :meth:`remember` и :meth:`reset` имеют
+дефолтную пустую реализацию — конкретная стратегия может их переопределить
+для ведения внутреннего состояния (шаблонов, истории).
+"""
 
 from __future__ import annotations
 
@@ -8,7 +15,7 @@ from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame
 
 
 class BaseReacquirer(ABC):
-    """Пытается вернуть цель после потери."""
+    """Базовый класс для всех recoverer-ов стадии target_recovery."""
 
     @abstractmethod
     def reacquire(
@@ -17,4 +24,19 @@ class BaseReacquirer(ABC):
         last_bbox: BoundingBox,
         motion: GlobalMotion,
     ) -> BoundingBox | None:
-        """Возвращает новый bbox или `None`, если вернуть цель не удалось."""
+        """Вернуть bbox цели на новом кадре или ``None``, если найти не удалось."""
+
+    def remember(self, frame: ProcessedFrame, bbox: BoundingBox) -> None:
+        """Запомнить, как сейчас выглядит уверенно сопровождаемая цель.
+
+        Pipeline вызывает этот метод на каждом подтверждённом TRACKING-кадре.
+        Конкретные реализации могут вести adaptive template, гистограмму,
+        embedding и т.п. По умолчанию ничего не делает.
+        """
+
+    def reset(self) -> None:
+        """Сбросить внутреннее состояние recoverer-а.
+
+        Pipeline вызывает этот метод при reset-команде или новом клике.
+        По умолчанию ничего не делает.
+        """

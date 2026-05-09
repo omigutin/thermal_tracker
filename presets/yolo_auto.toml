@@ -15,7 +15,13 @@ description = """
 kind = "auto_neural_detection"
 
 [preprocessing]
-method = "identity"
+# Минимальная цепочка для neural-режима без CLAHE и blur.
+methods = [
+    "resize",
+    "normalize_minmax",
+    "gradient",
+    "sharpness_metric",
+]
 resize_width = 960
 gaussian_kernel = 1
 median_kernel = 1

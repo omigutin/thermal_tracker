@@ -21,11 +21,17 @@ description = """
 kind = "manual_click_neural"
 
 [preprocessing]
-method = "identity"
+# Минимальная цепочка для neural-режима: масштабируем, нормализуем и считаем градиент.
+# Тяжёлый шумоподав и CLAHE не нужны — модель работает с менее обработанной картинкой.
+methods = [
+    "resize",
+    "normalize_minmax",
+    "gradient",
+    "sharpness_metric",
+]
 # Для neural-режима это в основном ограничение размера кадра, чтобы не душить железо.
 resize_width = 960
-# Эти параметры остаются для общей схемы пресетов, но в данном режиме почти не влияют,
-# потому что мы используем identity-preprocessor без агрессивной обработки.
+# Размеры ядер для blur оставлены минимальными на случай, если в пресет добавят blur-операции.
 gaussian_kernel = 1
 median_kernel = 1
 clahe_clip_limit = 2.0

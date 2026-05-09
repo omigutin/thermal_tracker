@@ -29,10 +29,30 @@ method = "opencv_mog2"
 method = "opencv_connected_components"
 
 [target_recovery]
+# Какой recoverer выбирает TargetRecovererManager (см. TargetRecovererType).
 method = "local_template"
+# После скольких подряд потерянных кадров pipeline дёргает recoverer.
+min_lost_frames = 5
+# Насколько расширяем last_bbox в зону поиска при попытке вернуть цель.
+search_padding = 60
+# Масштабы шаблона при template matching.
+scales = [0.84, 0.94, 1.0, 1.08, 1.18]
+# Минимальный score (TM_CCOEFF_NORMED), при котором считаем кандидата найденным.
+match_threshold = 0.5
+# Скорость обновления адаптивного шаблона при remember().
+template_alpha = 0.12
 
 [preprocessing]
-method = "thermal"
+# Последовательность атомарных операций предобработки кадра.
+methods = [
+    "resize",
+    "gaussian_blur",
+    "median_blur",
+    "normalize_minmax",
+    "clahe_contrast",
+    "gradient",
+    "sharpness_metric",
+]
 # Если кадр слишком широкий, уменьшаем его до этой ширины перед обработкой.
 resize_width = 960
 # Размер гауссова размытия для мягкого подавления обычного шума.

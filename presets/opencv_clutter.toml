@@ -28,10 +28,30 @@ method = "opencv_mog2"
 method = "opencv_connected_components"
 
 [target_recovery]
+# Какой recoverer выбирает TargetRecovererManager (см. TargetRecovererType).
 method = "local_template"
+# В плотной сцене лучше не торопиться: даём встроенной логике трекера ещё попыток.
+min_lost_frames = 8
+# Зона поиска уже среднего, чтобы не зацепить соседнюю похожую цель.
+search_padding = 50
+# Стандартный набор масштабов.
+scales = [0.84, 0.94, 1.0, 1.08, 1.18]
+# В плотной сцене порог выше — ложные совпадения дороже, чем пропущенный recovery.
+match_threshold = 0.6
+# Шаблон обновляем умеренно, чтобы не «съехать» на соседа.
+template_alpha = 0.1
 
 [preprocessing]
-method = "thermal"
+# Последовательность атомарных операций предобработки кадра.
+methods = [
+    "resize",
+    "gaussian_blur",
+    "median_blur",
+    "normalize_minmax",
+    "clahe_contrast",
+    "gradient",
+    "sharpness_metric",
+]
 # Если кадр слишком широкий, уменьшаем его до этой ширины перед обработкой.
 resize_width = 960
 # Размер гауссова размытия для мягкого подавления обычного шума.
