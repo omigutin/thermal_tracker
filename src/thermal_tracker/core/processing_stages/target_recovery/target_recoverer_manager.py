@@ -1,7 +1,16 @@
-"""Менеджер выбора метода повторного захвата цели."""
+"""Менеджер выбора и запуска стадии повторного захвата цели.
+
+Принимает тип recoverer-а и общую конфигурацию ``TargetRecoveryConfig``,
+из которой берёт нужные параметры для конкретной реализации. Проксирует
+методы базового контракта (``remember``, ``reacquire``, ``reset``) на
+выбранный recoverer.
+"""
 
 from __future__ import annotations
 
+from typing import TypeAlias
+
+from ...config import TargetRecoveryConfig
 from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame
 from .base_target_recoverer import BaseReacquirer
 from .candidate_based_target_recoverer import CandidateBasedReacquirer
@@ -11,20 +20,30 @@ from .multi_scale_target_recoverer import MultiScaleReacquirer
 from .target_recoverer_type import TargetRecovererType
 
 
-TargetRecovererInput = TargetRecovererType | str
+TargetRecovererInput: TypeAlias = TargetRecovererType | str
 
 
 class TargetRecovererManager:
     """Создаёт и запускает выбранный метод повторного захвата."""
 
-    def __init__(self, recoverer: TargetRecovererInput) -> None:
-        self._recoverer = self._build_recoverer(recoverer)
+    def __init__(
+        self,
+        recoverer: TargetRecovererInput,
+        config: TargetRecoveryConfig | None = None,
+    ) -> None:
+        self._config = config or TargetRecoveryConfig()
+        self._recoverer = self._build_recoverer(recoverer, self._config)
 
     @property
     def recoverer(self) -> BaseReacquirer:
         """Возвращает подготовленный recoverer."""
 
         return self._recoverer
+
+    def remember(self, frame: ProcessedFrame, bbox: BoundingBox) -> None:
+        """Передаёт recoverer-у уверенно сопровождаемую цель для обновления памяти."""
+
+        self._recoverer.remember(frame, bbox)
 
     def reacquire(
         self,
@@ -36,11 +55,25 @@ class TargetRecovererManager:
 
         return self._recoverer.reacquire(frame, last_bbox, motion)
 
+    def reset(self) -> None:
+        """Сбрасывает внутреннее состояние выбранного recoverer-а."""
+
+        self._recoverer.reset()
+
     @classmethod
-    def _build_recoverer(cls, recoverer: TargetRecovererInput) -> BaseReacquirer:
+    def _build_recoverer(
+        cls,
+        recoverer: TargetRecovererInput,
+        config: TargetRecoveryConfig,
+    ) -> BaseReacquirer:
         recoverer_type = cls._normalize_recoverer_type(recoverer)
         if recoverer_type == TargetRecovererType.LOCAL_TEMPLATE:
-            return LocalTemplateReacquirer()
+            return LocalTemplateReacquirer(
+                search_padding=config.search_padding,
+                scales=config.scales,
+                match_threshold=config.match_threshold,
+                template_alpha=config.template_alpha,
+            )
         if recoverer_type == TargetRecovererType.GLOBAL_SEARCH:
             return GlobalReacquirer()
         if recoverer_type == TargetRecovererType.CANDIDATE_BASED:

@@ -78,8 +78,14 @@ class TargetCandidateExtractionConfig:
 
 @dataclass
 class TargetRecoveryConfig:
-    """Параметры повторного захвата цели."""
-    method: str = "local_template"
+    """Параметры стадии повторного захвата цели."""
+
+    method: str = "local_template"  # Какой recoverer выбрать через TargetRecovererManager.
+    min_lost_frames: int = 5  # После скольких подряд потерянных кадров pipeline дёргает recoverer.
+    search_padding: int = 60  # Насколько расширяем last_bbox в зону поиска recovery.
+    scales: tuple[float, ...] = (0.84, 0.94, 1.0, 1.08, 1.18)  # Масштабы шаблона при поиске.
+    match_threshold: float = 0.5  # Минимальный score (TM_CCOEFF_NORMED), при котором считаем кандидата найденным.
+    template_alpha: float = 0.12  # Скорость обновления адаптивного шаблона при remember().
 
 
 @dataclass
@@ -256,6 +262,16 @@ def _normalize_preprocessing_section(section: dict[str, object]) -> dict[str, ob
     return normalized
 
 
+def _normalize_target_recovery_section(section: dict[str, object]) -> dict[str, object]:
+    """Подготавливает значения секции `target_recovery` перед созданием dataclass."""
+
+    normalized = dict(section)
+    scales = normalized.get("scales")
+    if scales is not None:
+        normalized["scales"] = tuple(float(value) for value in scales)
+    return normalized
+
+
 def _build_presentation(preset_name: str, meta: dict[str, object]) -> PresetPresentation:
     """Собирает описание пресета для интерфейса."""
     title = str(meta.get("title") or preset_name)
@@ -289,7 +305,9 @@ def _build_preset_record(path: Path) -> _PresetRecord:
     target_candidate_extraction = TargetCandidateExtractionConfig(
         **dict(data.get("target_candidate_extraction", {}))
     )
-    target_recovery = TargetRecoveryConfig(**dict(data.get("target_recovery", {})))
+    target_recovery = TargetRecoveryConfig(
+        **_normalize_target_recovery_section(dict(data.get("target_recovery", {})))
+    )
     candidate_filtering = CandidateFilteringConfig(
         **_normalize_candidate_filtering_section(dict(data.get("candidate_filtering", {})))
     )
