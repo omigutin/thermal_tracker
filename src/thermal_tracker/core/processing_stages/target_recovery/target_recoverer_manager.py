@@ -50,10 +50,11 @@ class TargetRecovererManager:
         frame: ProcessedFrame,
         last_bbox: BoundingBox,
         motion: GlobalMotion,
+        lost_frames: int = 0,
     ) -> BoundingBox | None:
         """Пытается вернуть потерянную цель."""
 
-        return self._recoverer.reacquire(frame, last_bbox, motion)
+        return self._recoverer.reacquire(frame, last_bbox, motion, lost_frames)
 
     def reset(self) -> None:
         """Сбрасывает внутреннее состояние выбранного recoverer-а."""
@@ -70,6 +71,7 @@ class TargetRecovererManager:
         if recoverer_type == TargetRecovererType.LOCAL_TEMPLATE:
             return LocalTemplateReacquirer(
                 search_padding=config.search_padding,
+                search_padding_growth=config.search_padding_growth,
                 scales=config.scales,
                 match_threshold=config.match_threshold,
                 template_alpha=config.template_alpha,

@@ -14,5 +14,6 @@ class GlobalReacquirer(BaseReacquirer):
         frame: ProcessedFrame,
         last_bbox: BoundingBox,
         motion: GlobalMotion,
+        lost_frames: int = 0,
     ) -> BoundingBox | None:
-        raise NotImplementedError("Global reacquirer пока не реализован.")
+        raise NotImplementedError("Global reacquirer is not implemented yet.")

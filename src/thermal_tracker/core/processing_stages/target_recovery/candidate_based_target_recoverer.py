@@ -14,5 +14,6 @@ class CandidateBasedReacquirer(BaseReacquirer):
         frame: ProcessedFrame,
         last_bbox: BoundingBox,
         motion: GlobalMotion,
+        lost_frames: int = 0,
     ) -> BoundingBox | None:
-        raise NotImplementedError("Candidate-based reacquirer пока не реализован.")
+        raise NotImplementedError("Candidate-based reacquirer is not implemented yet.")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ...domain.models import GlobalMotion, ProcessedFrame, TrackSnapshot
+from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot
 
 
 class BaseSingleTargetTracker(ABC):
@@ -25,3 +25,19 @@ class BaseSingleTargetTracker(ABC):
     @abstractmethod
     def reset(self) -> TrackSnapshot:
         """Сбрасывает текущее состояние трекера."""
+
+    def resume_tracking(
+        self,
+        frame: ProcessedFrame,
+        bbox: BoundingBox,
+        track_id: int,
+    ) -> TrackSnapshot:
+        """Возобновляет сопровождение цели с конкретным track_id и bbox.
+
+        Используется pipeline-ом после подтверждённого recovery, чтобы
+        продолжить трек с тем же ID и не плодить новые. По умолчанию
+        метод не реализован: конкретный трекер должен переопределить
+        его, если участвует в сценариях с recovery.
+        """
+
+        raise NotImplementedError("resume_tracking is not implemented for this tracker.")

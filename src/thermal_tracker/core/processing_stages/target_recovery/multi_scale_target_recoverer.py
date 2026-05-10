@@ -14,5 +14,6 @@ class MultiScaleReacquirer(BaseReacquirer):
         frame: ProcessedFrame,
         last_bbox: BoundingBox,
         motion: GlobalMotion,
+        lost_frames: int = 0,
     ) -> BoundingBox | None:
-        raise NotImplementedError("Multi-scale reacquirer пока не реализован.")
+        raise NotImplementedError("Multi-scale reacquirer is not implemented yet.")

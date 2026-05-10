@@ -42,11 +42,13 @@ class LocalTemplateReacquirer(BaseReacquirer):
     def __init__(
         self,
         search_padding: int = 60,
+        search_padding_growth: int = 8,
         scales: Sequence[float] = (0.84, 0.94, 1.0, 1.08, 1.18),
         match_threshold: float = 0.5,
         template_alpha: float = 0.12,
     ) -> None:
         self._search_padding = max(0, search_padding)
+        self._search_padding_growth = max(0, search_padding_growth)
         self._scales = tuple(float(scale) for scale in scales) or (1.0,)
         self._match_threshold = float(match_threshold)
         self._template_alpha = float(np.clip(template_alpha, 0.0, 1.0))
@@ -85,15 +87,21 @@ class LocalTemplateReacquirer(BaseReacquirer):
         frame: ProcessedFrame,
         last_bbox: BoundingBox,
         motion: GlobalMotion,
+        lost_frames: int = 0,
     ) -> BoundingBox | None:
-        """Ищет цель в расширенной зоне поиска вокруг ``last_bbox``."""
+        """Ищет цель в расширенной зоне поиска вокруг ``last_bbox``.
+
+        Зона поиска растёт линейно: ``search_padding + lost_frames * search_padding_growth``.
+        Это даёт recoverer-у шанс догнать цель, ушедшую дальше из узкой стартовой зоны.
+        """
 
         if self._canonical_size is None or self._adaptive_template is None or self._long_term_template is None:
             return None
 
         frame_gray = frame.gray
         shifted_bbox = self._shift_bbox_by_motion(last_bbox, motion).clamp(frame_gray.shape)
-        search_region = shifted_bbox.pad(self._search_padding, self._search_padding).clamp(frame_gray.shape)
+        effective_padding = self._search_padding + max(0, int(lost_frames)) * self._search_padding_growth
+        search_region = shifted_bbox.pad(effective_padding, effective_padding).clamp(frame_gray.shape)
         search_patch = _crop_gray(frame_gray, search_region)
         if search_patch is None:
             return None

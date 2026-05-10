@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ...config import ClickSelectionConfig, NeuralConfig, TrackerConfig
-from ...domain.models import GlobalMotion, ProcessedFrame, TrackSnapshot
+from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot
 from .base_target_tracker import BaseSingleTargetTracker
 from .nn_yolo_target_tracker import YoloTrackSingleTargetTracker
 from .opencv_template_point_target_tracker import ClickToTrackSingleTargetTracker
@@ -50,6 +50,16 @@ class TargetTrackerManager:
         """Сбрасывает состояние трекера."""
 
         return self._tracker.reset()
+
+    def resume_tracking(
+        self,
+        frame: ProcessedFrame,
+        bbox: BoundingBox,
+        track_id: int,
+    ) -> TrackSnapshot:
+        """Возобновляет сопровождение цели с тем же track_id после recovery."""
+
+        return self._tracker.resume_tracking(frame, bbox, track_id)
 
     def __getattr__(self, name: str):
         return getattr(self._tracker, name)

@@ -1055,3 +1055,55 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
         point_center = np.median(self._tracked_points.reshape(-1, 2), axis=0)
         bbox_center = np.array(bbox.center, dtype=np.float32)
         self._point_center_offset = bbox_center - point_center
+
+    def resume_tracking(
+        self,
+        frame: ProcessedFrame,
+        bbox: BoundingBox,
+        track_id: int,
+    ) -> TrackSnapshot:
+        """Возобновляет сопровождение по подтверждённому recovery-bbox без смены track_id.
+
+        Используется из pipeline после того, как track-before-confirm
+        подтвердил кандидата от recoverer. Трек продолжается под тем же
+        ID, что и до потери; ``_next_track_id`` не инкрементируется.
+        """
+
+        clamped = bbox.clamp(frame.bgr.shape)
+        canonical_w = max(self.config.min_box_size, clamped.width)
+        canonical_h = max(self.config.min_box_size, clamped.height)
+        canonical_size = (canonical_w, canonical_h)
+
+        gray_patch = _crop(frame.normalized, clamped)
+        grad_patch = _crop(frame.gradient, clamped)
+        if gray_patch is None or grad_patch is None:
+            return self.reset()
+
+        self._track_id = track_id
+        self._canonical_size = canonical_size
+        self._bbox = clamped
+        self._predicted_bbox = clamped
+        self._search_region = clamped.pad(
+            self.config.search_margin, self.config.search_margin
+        ).clamp(frame.bgr.shape)
+        self._lost_frames = 0
+        self._state = TrackerState.TRACKING
+        self._score = 1.0
+        self._message = f"Resumed target #{track_id}"
+        self._residual_velocity[:] = 0.0
+        self._camera_offset[:] = 0.0
+        self._target_polarity = self._resolve_target_polarity(frame, clamped, "unknown")
+        self._motion_model.initialize(self._to_motion_model_bbox(clamped))
+        self._sharpness_baseline = self._measure_frame_sharpness(frame)
+        self._degraded_frames = 0
+        self._blur_hold_frames = 0
+
+        self._long_term_gray = _safe_resize(gray_patch, canonical_size)
+        self._long_term_grad = _safe_resize(grad_patch, canonical_size)
+        self._adaptive_gray = self._long_term_gray.copy()
+        self._adaptive_grad = self._long_term_grad.copy()
+
+        self._initialize_feature_points(frame, clamped, force=True)
+        self._previous_normalized = frame.normalized.copy()
+        self._update_exit_edges(clamped, frame.bgr.shape)
+        return self.snapshot(GlobalMotion())

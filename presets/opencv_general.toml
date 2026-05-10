@@ -33,14 +33,20 @@ method = "opencv_connected_components"
 method = "local_template"
 # После скольких подряд потерянных кадров pipeline дёргает recoverer.
 min_lost_frames = 5
-# Насколько расширяем last_bbox в зону поиска при попытке вернуть цель.
+# Базовый радиус расширения last_bbox в зону поиска при попытке вернуть цель.
 search_padding = 60
+# Сколько пикселей добавляется к радиусу за каждый дополнительный потерянный кадр.
+search_padding_growth = 8
 # Масштабы шаблона при template matching.
 scales = [0.84, 0.94, 1.0, 1.08, 1.18]
 # Минимальный score (TM_CCOEFF_NORMED), при котором считаем кандидата найденным.
 match_threshold = 0.5
 # Скорость обновления адаптивного шаблона при remember().
 template_alpha = 0.12
+# Сколько подряд согласованных кадров нужно для перехода RECOVERING -> TRACKING.
+confirm_frames = 3
+# Окно RECOVERING в кадрах: после него pipeline уходит в LOST.
+recovery_window_frames = 30
 
 [preprocessing]
 # Последовательность атомарных операций предобработки кадра.
