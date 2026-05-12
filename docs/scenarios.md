@@ -1,17 +1,19 @@
 # Сценарии
 
-Сценарий — это готовая схема работы системы для конкретного режима.
+Сценарий — это готовая сборка стадий обработки и правил состояния.
 
-## Основные сценарии
+Актуальные имена сценариев (по коду):
 
-- `opencv_manual` — ручной режим с классическим pipeline;
-- `nn_manual` — ручной режим с нейросетевыми детекциями;
-- `nn_auto` — автоматический режим с NN;
-- `opencv_auto_motion` — автоматический режим на классических методах.
+- `opencv_manual`
+- `opencv_auto_motion`
+- `nn_manual`
+- `nn_auto`
 
-## Что важно в `opencv_manual`
+Псевдонимы `pipeline.kind`, которые маппятся в эти сценарии:
 
-В этом сценарии выбор трекера зависит от пресета:
+- `manual_click_classical` -> `opencv_manual`
+- `auto_motion_tracking` -> `opencv_auto_motion`
+- `manual_click_neural` -> `nn_manual`
+- `auto_neural_detection` -> `nn_auto`
 
-- если в пресете есть секция `irst_tracking`, используется IRST-трекер;
-- иначе используется классический OpenCV template-point трекер.
+Создание сценария выполняется через `ScenarioFactory`.
