@@ -26,13 +26,6 @@ PIPELINE_KIND_TO_SCENARIO = {
     "auto_motion_tracking": "opencv_auto_motion",
 }
 
-SCENARIO_ALIASES = {
-    "manual_click_classical": "opencv_manual",
-    "manual_click_neural": "nn_manual",
-    "auto_neural_detection": "nn_auto",
-    "auto_motion_tracking": "opencv_auto_motion",
-}
-
 
 def default_preset_for_scenario(scenario_name: str) -> str:
     normalized = normalize_scenario_name(scenario_name)
@@ -40,8 +33,10 @@ def default_preset_for_scenario(scenario_name: str) -> str:
 
 
 def normalize_scenario_name(scenario_name: str) -> str:
+    """Приводит имя сценария или псевдоним pipeline_kind к каноническому имени сценария."""
+
     requested = (scenario_name or "").strip()
-    return SCENARIO_ALIASES.get(requested, requested or "opencv_manual")
+    return PIPELINE_KIND_TO_SCENARIO.get(requested, requested or "opencv_manual")
 
 
 def _build_opencv_manual(preset_name: str, preset_override: TrackerPreset | None) -> object:

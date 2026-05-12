@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
+from ..processing_stages.target_tracking.target_tracker_type import TargetTrackerType
 from ..domain.models import BoundingBox, DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..processing_stages.frame_preprocessing import FramePreprocessorManager
@@ -27,13 +28,17 @@ class ManualClickTrackingPipeline:
 
     def __init__(self, preset_name: str, preset_override: TrackerPreset | None = None) -> None:
         self.preset: TrackerPreset = preset_override or build_preset(preset_name)
+        if self.preset.opencv_tracker is None:
+            raise RuntimeError(
+                f"Preset {self.preset.name!r} does not contain [opencv_tracking] section "
+                f"required by ManualClickTrackingPipeline."
+            )
         self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.tracker = TargetTrackerManager(
-            self.preset.tracker.method,
-            self.preset.tracker,
+            TargetTrackerType.OPENCV_TEMPLATE_POINT,
+            self.preset.opencv_tracker,
             self.preset.click_selection,
-            self.preset.neural,
         )
         self.recoverer = TargetRecovererManager(
             self.preset.target_recovery.method,
@@ -335,7 +340,7 @@ class ManualClickTrackingPipeline:
 
         if self.current_frame is None:
             return False
-        margin = max(0, int(self.preset.tracker.edge_exit_margin))
+        margin = max(0, int(self.preset.opencv_tracker.edge_exit_margin))
         frame_h, frame_w = self.current_frame.bgr.shape[:2]
         return (
             bbox.x <= margin

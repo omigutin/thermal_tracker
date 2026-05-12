@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
+from ..processing_stages.target_tracking.target_tracker_type import TargetTrackerType
 from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..processing_stages.frame_preprocessing import FramePreprocessorManager
@@ -25,12 +26,17 @@ class ManualClickNeuralPipeline:
         self.preset: TrackerPreset = preset_override or build_preset(preset_name)
         if self.preset.neural is None:
             raise RuntimeError(f"Пресет {preset_name!r} не содержит секцию [neural].")
+        if self.preset.yolo_tracker is None:
+            raise RuntimeError(
+                f"Пресет {preset_name!r} не содержит секцию [yolo_tracking], "
+                f"необходимую для ManualClickNeuralPipeline."
+            )
 
         self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.tracker = TargetTrackerManager(
-            self.preset.tracker.method,
-            self.preset.tracker,
+            TargetTrackerType.NN_YOLO,
+            self.preset.yolo_tracker,
             self.preset.click_selection,
             self.preset.neural,
         )

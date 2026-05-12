@@ -18,7 +18,7 @@ import numpy as np
 
 from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, MotionDetectionResult, ProcessedFrame
-from ..domain.runtime import AutoScenarioStepResult
+from ..domain.runtime import AutoScenarioStepResult, SessionRuntimeState
 from ..processing_stages.candidate_filtering import CandidateFilterManager
 from ..processing_stages.moving_area_detection import MovingAreaDetectorManager
 from ..processing_stages.target_candidate_extraction import TargetCandidateExtractorManager
@@ -52,8 +52,17 @@ class AutoMotionTrackingPipeline:
 
         return self.preset.name
 
-    def process_next_raw_frame(self, raw_frame: np.ndarray) -> AutoScenarioStepResult:
-        """Прогоняет кадр через автоматический контур."""
+    def process_next_raw_frame(
+        self,
+        raw_frame: np.ndarray,
+        runtime_state: SessionRuntimeState | None = None,
+    ) -> AutoScenarioStepResult:
+        """Прогоняет кадр через автоматический контур.
+
+        ``runtime_state`` принимается для унификации сигнатуры с другими
+        сценариями, но в этом контуре не используется: автоматический режим
+        не обрабатывает ни клики, ни команды сброса.
+        """
 
         self.current_frame = self.preprocessor.process(raw_frame)
         self.current_motion = self.motion_estimator.estimate(self.current_frame)

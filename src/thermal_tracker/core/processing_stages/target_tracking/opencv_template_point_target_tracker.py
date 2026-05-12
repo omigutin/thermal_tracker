@@ -17,7 +17,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from ...config import ClickSelectionConfig, TrackerConfig
+from ...config import ClickSelectionConfig, OpenCVTrackerConfig
 from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..target_selection import TargetSelectorManager
 from .base_target_tracker import BaseSingleTargetTracker
@@ -62,7 +62,7 @@ class ClickToTrackSingleTargetTracker(BaseSingleTargetTracker):
     - если цель пропала, расширяем область поиска и пытаемся вернуть тот же ID.
     """
 
-    def __init__(self, tracker_config: TrackerConfig, click_config: ClickSelectionConfig) -> None:
+    def __init__(self, tracker_config: OpenCVTrackerConfig, click_config: ClickSelectionConfig) -> None:
         self.config = tracker_config
         self.selector = TargetSelectorManager(click_config.method, click_config)
         self._next_track_id = 0

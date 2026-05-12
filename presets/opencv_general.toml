@@ -126,13 +126,14 @@ max_expanded_fill = 0.6
 # Во сколько раз расширенный объект может быть больше исходного ядра.
 max_expansion_ratio = 8.0
 
-[tracking]
-method = "opencv_template_point"
+[opencv_tracking]
 # Запас вокруг предсказанной позиции при обычном поиске.
 search_margin = 24
 # На сколько расширяем область поиска, когда цель начала теряться.
 lost_search_growth = 18
-# После скольких пропусков разрешаем почти полный поиск по кадру.
+# Намеренно большое значение: явный full-frame switch отключён.
+# Expanding margin (search_margin + lost_frames * lost_search_growth) покрывает весь кадр
+# органически до истечения max_lost_frames, не создавая резкого скачка зоны поиска.
 full_frame_after = 999
 # Сколько кадров подряд можно терпеть потерю цели.
 max_lost_frames = 70

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import cv2
 
-from ...config import ClickSelectionConfig, TrackerConfig
+from ...config import ClickSelectionConfig, OpenCVTrackerConfig
 from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..target_selection import ClickTargetSelector
 from .base_target_tracker import BaseSingleTargetTracker
@@ -21,7 +21,7 @@ def _resolve_csrt_factory():
 class CsrtSingleTargetTracker(BaseSingleTargetTracker):
     """Трекер одной цели на базе готового CSRT."""
 
-    def __init__(self, tracker_config: TrackerConfig, click_config: ClickSelectionConfig) -> None:
+    def __init__(self, tracker_config: OpenCVTrackerConfig, click_config: ClickSelectionConfig) -> None:
         self.config = tracker_config
         self.selector = ClickTargetSelector(click_config)
         self._tracker_factory = _resolve_csrt_factory()

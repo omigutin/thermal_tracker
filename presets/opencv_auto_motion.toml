@@ -1,0 +1,88 @@
+# Автоматический режим обнаружения движущихся объектов без ручного клика.
+# Не требует участия оператора: детектирует и фильтрует кандидатов на каждом кадре.
+# Не ведёт одну цель — результатом является список отфильтрованных объектов.
+
+[meta]
+id = "opencv_auto_motion"
+title = "OpenCV Auto Motion"
+tooltip = "Автоматическое обнаружение движущихся объектов без ручного выбора цели."
+description = """
+Автоматический режим: обнаруживает все движущиеся объекты через MOG2 и фильтрует кандидатов.
+Не требует клика оператора. Используй как детектор сцены или основу для multi-target контура.
+"""
+
+[pipeline]
+kind = "auto_motion_tracking"
+
+[preprocessing]
+methods = [
+    "resize",
+    "gaussian_blur",
+    "median_blur",
+    "normalize_minmax",
+    "clahe_contrast",
+    "gradient",
+    "sharpness_metric",
+]
+resize_width = 960
+gaussian_kernel = 5
+median_kernel = 3
+clahe_clip_limit = 2.0
+clahe_tile_grid_size = 8
+gradient_blur_kernel = 3
+
+[global_motion]
+method = "opencv_phase_correlation"
+enabled = true
+downscale = 0.5
+blur_kernel = 9
+min_response = 0.2
+max_shift_ratio = 0.35
+
+[moving_area_detection]
+method = "opencv_mog2"
+
+[target_candidate_extraction]
+method = "opencv_connected_components"
+
+[candidate_filtering]
+filters = ["area_aspect", "border_touch", "contrast"]
+
+[target_recovery]
+method = "local_template"
+min_lost_frames = 5
+search_padding = 60
+search_padding_growth = 8
+scales = [0.84, 0.94, 1.0, 1.08, 1.18]
+match_threshold = 0.5
+template_alpha = 0.12
+confirm_frames = 3
+recovery_window_frames = 30
+
+[click_selection]
+method = "opencv_click"
+search_radius = 96
+similarity_sigma = 1.55
+local_window_radius = 5
+min_tolerance = 10
+max_tolerance = 56
+min_component_area = 12
+max_component_fill = 0.55
+max_patch_span_ratio = 0.85
+max_refine_growth = 1.8
+retry_scale = 1.6
+max_retry_radius = 180
+padding = 5
+fallback_size = 20
+expansion_margin = 24
+background_ring = 12
+foreground_fraction = 0.42
+min_object_contrast = 5.0
+max_expanded_fill = 0.6
+max_expansion_ratio = 8.0
+
+[visualization]
+show_search_region = false
+show_predicted_box = false
+show_global_motion = true
+line_thickness = 1

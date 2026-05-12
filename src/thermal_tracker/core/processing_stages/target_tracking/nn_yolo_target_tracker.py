@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 
-from ...config import ClickSelectionConfig, NeuralConfig, TrackerConfig
+from ...config import ClickSelectionConfig, NeuralConfig, YoloTrackerConfig
 from ...domain.models import BoundingBox, DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ...nnet_interface import YoloNnetInterface
 from .base_target_tracker import BaseSingleTargetTracker
@@ -27,7 +27,7 @@ class YoloTrackSingleTargetTracker(BaseSingleTargetTracker):
 
     def __init__(
         self,
-        tracker_config: TrackerConfig,
+        tracker_config: YoloTrackerConfig,
         click_config: ClickSelectionConfig,
         neural_config: NeuralConfig,
     ) -> None:
@@ -213,7 +213,7 @@ class YoloTrackSingleTargetTracker(BaseSingleTargetTracker):
         self._target_class_id = candidate.class_id
         self._score = candidate.confidence
         self._lost_frames = 0
-        self._state = TrackerState.TRACKING if not reacquired else TrackerState.TRACKING
+        self._state = TrackerState.TRACKING
 
     def _expand_search_region(self, frame_shape: tuple[int, int] | tuple[int, int, int]) -> BoundingBox | None:
         if self._bbox is None:

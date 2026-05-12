@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ...config import ClickSelectionConfig, NeuralConfig, TrackerConfig
-from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame, TrackSnapshot
+from ...config import ClickSelectionConfig, NeuralConfig, OpenCVTrackerConfig, YoloTrackerConfig
+from ...domain.models import BoundingBox, DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot
 from .base_target_tracker import BaseSingleTargetTracker
 from .nn_yolo_target_tracker import YoloTrackSingleTargetTracker
 from .opencv_template_point_target_tracker import ClickToTrackSingleTargetTracker
@@ -19,7 +19,7 @@ class TargetTrackerManager:
     def __init__(
         self,
         tracker: TargetTrackerInput,
-        tracker_config: TrackerConfig,
+        tracker_config: OpenCVTrackerConfig | YoloTrackerConfig,
         click_config: ClickSelectionConfig,
         neural_config: NeuralConfig | None = None,
     ) -> None:
@@ -61,21 +61,40 @@ class TargetTrackerManager:
 
         return self._tracker.resume_tracking(frame, bbox, track_id)
 
-    def __getattr__(self, name: str):
-        return getattr(self._tracker, name)
+    @property
+    def latest_detections(self) -> tuple[DetectedObject, ...]:
+        """Возвращает последний набор нейросетевых детекций.
+
+        Не пусто только у YoloTrackSingleTargetTracker. Для OpenCV-трекера
+        возвращает пустой кортеж, чтобы вызывающий код мог не делать isinstance.
+        """
+
+        if isinstance(self._tracker, YoloTrackSingleTargetTracker):
+            return self._tracker.latest_detections
+        return ()
 
     @classmethod
     def _build_tracker(
         cls,
         tracker: TargetTrackerInput,
-        tracker_config: TrackerConfig,
+        tracker_config: OpenCVTrackerConfig | YoloTrackerConfig,
         click_config: ClickSelectionConfig,
         neural_config: NeuralConfig | None,
     ) -> BaseSingleTargetTracker:
         tracker_type = cls._normalize_tracker_type(tracker)
         if tracker_type == TargetTrackerType.OPENCV_TEMPLATE_POINT:
+            if not isinstance(tracker_config, OpenCVTrackerConfig):
+                raise TypeError(
+                    f"OpenCV template tracker requires OpenCVTrackerConfig, "
+                    f"got {type(tracker_config).__name__}."
+                )
             return ClickToTrackSingleTargetTracker(tracker_config, click_config)
         if tracker_type == TargetTrackerType.NN_YOLO:
+            if not isinstance(tracker_config, YoloTrackerConfig):
+                raise TypeError(
+                    f"YOLO tracker requires YoloTrackerConfig, "
+                    f"got {type(tracker_config).__name__}."
+                )
             if neural_config is None:
                 raise ValueError("NN YOLO tracker requires neural config.")
             return YoloTrackSingleTargetTracker(tracker_config, click_config, neural_config)

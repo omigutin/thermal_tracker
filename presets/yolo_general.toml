@@ -70,35 +70,10 @@ min_object_contrast = 6.0
 max_expanded_fill = 0.58
 max_expansion_ratio = 5.5
 
-[tracking]
-method = "nn_yolo"
-# В neural-режиме эти параметры в основном управляют повторным захватом вручную выбранной цели.
+[yolo_tracking]
 search_margin = 30
 lost_search_growth = 26
-full_frame_after = 14
 max_lost_frames = 90
-scales = [0.82, 0.94, 1.0, 1.08, 1.18]
-track_threshold = 0.42
-reacquire_threshold = 0.5
-template_update_threshold = 0.62
-template_alpha = 0.12
-velocity_alpha = 0.45
-min_box_size = 12
-distance_penalty = 0.18
-max_size_growth = 1.25
-max_size_shrink = 0.72
-max_size_growth_on_reacquire = 1.6
-max_size_shrink_on_reacquire = 0.55
-max_feature_points = 40
-min_feature_points = 6
-feature_quality_level = 0.02
-feature_min_distance = 6
-feature_refresh_interval = 6
-point_search_margin = 14
-max_tracking_center_shift = 1.45
-max_reacquire_center_shift = 2.4
-reacquire_center_growth = 0.28
-
 [visualization]
 show_search_region = true
 show_predicted_box = true

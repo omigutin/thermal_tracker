@@ -122,22 +122,28 @@ class ClickSelectionConfig:
 
 
 @dataclass
-class TrackerConfig:
-    """Параметры самого трекера и повторного поиска цели."""
+class OpenCVTrackerConfig:
+    """Параметры classical single-target трекера (opencv_template_point).
 
-    method: str = "opencv_template_point"
-    search_margin: int = 30
-    lost_search_growth: int = 26
-    full_frame_after: int = 14
-    max_lost_frames: int = 90
-    scales: tuple[float, ...] = (0.82, 0.94, 1.0, 1.08, 1.18)
+    Все поля используются исключительно ClickToTrackSingleTargetTracker.
+    Секция TOML: [opencv_tracking].
+    """
+
+    search_margin: int = 24
+    lost_search_growth: int = 18
+    # Намеренно большое значение: явный full-frame switch отключён.
+    # Expanding margin (search_margin + lost_frames * lost_search_growth) покрывает весь кадр
+    # органически до истечения max_lost_frames, не создавая резкого скачка зоны поиска.
+    full_frame_after: int = 999
+    max_lost_frames: int = 70
+    scales: tuple[float, ...] = (0.72, 0.84, 0.94, 1.0, 1.08, 1.18, 1.32)
     track_threshold: float = 0.42
     reacquire_threshold: float = 0.5
     template_update_threshold: float = 0.62
     template_alpha: float = 0.12
     velocity_alpha: float = 0.45
-    min_box_size: int = 12
-    distance_penalty: float = 0.18
+    min_box_size: int = 8
+    distance_penalty: float = 0.14
     max_size_growth: float = 1.25
     max_size_shrink: float = 0.72
     max_size_growth_on_reacquire: float = 1.6
@@ -149,15 +155,28 @@ class TrackerConfig:
     feature_min_distance: int = 6
     feature_refresh_interval: int = 6
     point_search_margin: int = 14
-    max_tracking_center_shift: float = 1.45
-    max_reacquire_center_shift: float = 2.4
-    reacquire_center_growth: float = 0.28
+    max_tracking_center_shift: float = 1.6
+    max_reacquire_center_shift: float = 2.8
+    reacquire_center_growth: float = 0.32
     edge_exit_margin: int = 10
     edge_exit_max_lost_frames: int = 4
     blur_hold_enabled: bool = True
-    blur_sharpness_drop_ratio: float = 0.55
-    blur_hold_max_frames: int = 70
-    blur_hold_center_growth: float = 0.07
+    blur_sharpness_drop_ratio: float = 0.5
+    blur_hold_max_frames: int = 120
+    blur_hold_center_growth: float = 0.06
+
+
+@dataclass
+class YoloTrackerConfig:
+    """Параметры NN single-target трекера (nn_yolo).
+
+    Содержит только поля, которые реально читает YoloTrackSingleTargetTracker.
+    Секция TOML: [yolo_tracking].
+    """
+
+    max_lost_frames: int = 90
+    search_margin: int = 30
+    lost_search_growth: int = 26
 
 
 @dataclass
@@ -197,9 +216,10 @@ class TrackerPreset:
     target_recovery: TargetRecoveryConfig
     candidate_filtering: CandidateFilteringConfig
     click_selection: ClickSelectionConfig
-    tracker: TrackerConfig
     visualization: VisualizationConfig
     pipeline_kind: str = "manual_click_classical"
+    opencv_tracker: OpenCVTrackerConfig | None = None
+    yolo_tracker: YoloTrackerConfig | None = None
     neural: NeuralConfig | None = None
 
 
@@ -232,8 +252,8 @@ def _read_toml(path: Path) -> dict[str, object]:
     return loaded
 
 
-def _normalize_tracker_section(section: dict[str, object]) -> dict[str, object]:
-    """Подготавливает значения секции `tracking` перед созданием dataclass."""
+def _normalize_opencv_tracker_section(section: dict[str, object]) -> dict[str, object]:
+    """Подготавливает значения секции `[opencv_tracking]` перед созданием OpenCVTrackerConfig."""
 
     normalized = dict(section)
     scales = normalized.get("scales")
@@ -330,9 +350,20 @@ def _build_preset_record(path: Path) -> _PresetRecord:
         **_normalize_candidate_filtering_section(dict(data.get("candidate_filtering", {})))
     )
     click_selection = ClickSelectionConfig(**dict(data.get("click_selection", {})))
-    tracker = TrackerConfig(**_normalize_tracker_section(dict(data.get("tracking", {}))))
     visualization = VisualizationConfig(**dict(data.get("visualization", {})))
     pipeline_kind = str(pipeline.get("kind") or "manual_click_classical").strip() or "manual_click_classical"
+
+    opencv_tracking_data = data.get("opencv_tracking")
+    opencv_tracker: OpenCVTrackerConfig | None = None
+    if isinstance(opencv_tracking_data, dict):
+        opencv_tracker = OpenCVTrackerConfig(
+            **_normalize_opencv_tracker_section(opencv_tracking_data)
+        )
+
+    yolo_tracking_data = data.get("yolo_tracking")
+    yolo_tracker: YoloTrackerConfig | None = None
+    if isinstance(yolo_tracking_data, dict):
+        yolo_tracker = YoloTrackerConfig(**dict(yolo_tracking_data))
 
     neural_section = data.get("neural")
     neural = None
@@ -349,9 +380,10 @@ def _build_preset_record(path: Path) -> _PresetRecord:
             target_recovery=target_recovery,
             candidate_filtering=candidate_filtering,
             click_selection=click_selection,
-            tracker=tracker,
             visualization=visualization,
             pipeline_kind=pipeline_kind,
+            opencv_tracker=opencv_tracker,
+            yolo_tracker=yolo_tracker,
             neural=neural,
         ),
         presentation=_build_presentation(preset_name, meta),
