@@ -28,16 +28,28 @@ class ManualClickTrackingPipeline:
 
     def __init__(self, preset_name: str, preset_override: TrackerPreset | None = None) -> None:
         self.preset: TrackerPreset = preset_override or build_preset(preset_name)
-        if self.preset.opencv_tracker is None:
+
+        # Выбираем трекер: IRST имеет приоритет, если задана секция [irst_tracking].
+        if self.preset.irst_tracker is not None:
+            tracker_type = TargetTrackerType.IRST_CONTRAST
+            tracker_config = self.preset.irst_tracker
+            # IRST-трекер управляет IDLE через max_lost_frames — граница кадра не проверяется.
+            self._edge_exit_margin: int = 0
+        elif self.preset.opencv_tracker is not None:
+            tracker_type = TargetTrackerType.OPENCV_TEMPLATE_POINT
+            tracker_config = self.preset.opencv_tracker
+            self._edge_exit_margin = int(self.preset.opencv_tracker.edge_exit_margin)
+        else:
             raise RuntimeError(
-                f"Preset {self.preset.name!r} does not contain [opencv_tracking] section "
+                f"Preset {self.preset.name!r} does not contain [opencv_tracking] or [irst_tracking] section "
                 f"required by ManualClickTrackingPipeline."
             )
+
         self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.tracker = TargetTrackerManager(
-            TargetTrackerType.OPENCV_TEMPLATE_POINT,
-            self.preset.opencv_tracker,
+            tracker_type,
+            tracker_config,
             self.preset.click_selection,
         )
         self.recoverer = TargetRecovererManager(
@@ -340,7 +352,7 @@ class ManualClickTrackingPipeline:
 
         if self.current_frame is None:
             return False
-        margin = max(0, int(self.preset.opencv_tracker.edge_exit_margin))
+        margin = self._edge_exit_margin
         frame_h, frame_w = self.current_frame.bgr.shape[:2]
         return (
             bbox.x <= margin

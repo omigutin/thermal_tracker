@@ -10,6 +10,7 @@ class TargetTrackerType(StrEnum):
 
     OPENCV_TEMPLATE_POINT = "opencv_template_point"  # Гибрид шаблонного поиска, опорных точек и модели движения.
     NN_YOLO = "nn_yolo"  # Сопровождение выбранной цели через YOLO-детекции и внешний NN-интерфейс.
+    IRST_CONTRAST = "irst_contrast"  # IRST: локальный контраст + фильтр Калмана, без шаблонов и optical flow.
 
     # OPENCV_KCF = "opencv_kcf"  # Быстрый классический OpenCV-трекер для одной цели.
     # OPENCV_CSRT = "opencv_csrt"  # Более точный, но более тяжелый OpenCV-трекер.

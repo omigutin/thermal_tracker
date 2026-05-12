@@ -15,6 +15,7 @@ from ...domain.models import BoundingBox, GlobalMotion, ProcessedFrame
 from .base_target_recoverer import BaseReacquirer
 from .candidate_based_target_recoverer import CandidateBasedReacquirer
 from .global_search_target_recoverer import GlobalReacquirer
+from .irst_contrast_target_recoverer import IrstContrastRecoverer
 from .local_template_target_recoverer import LocalTemplateReacquirer
 from .multi_scale_target_recoverer import MultiScaleReacquirer
 from .target_recoverer_type import TargetRecovererType
@@ -82,6 +83,11 @@ class TargetRecovererManager:
             return CandidateBasedReacquirer()
         if recoverer_type == TargetRecovererType.MULTI_SCALE:
             return MultiScaleReacquirer()
+        if recoverer_type == TargetRecovererType.IRST_CONTRAST:
+            return IrstContrastRecoverer(
+                search_padding=config.search_padding,
+                search_padding_growth=config.search_padding_growth,
+            )
         raise ValueError(f"Unsupported target recoverer type: {recoverer_type!r}.")
 
     @staticmethod

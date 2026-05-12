@@ -179,6 +179,66 @@ class YoloTrackerConfig:
     lost_search_growth: int = 26
 
 
+@dataclass(frozen=True)
+class IrstTrackerConfig:
+    """Параметры IRST-трекера (irst_contrast) на базе локального контраста и фильтра Калмана.
+
+    IRST — Infrared Search and Track / инфракрасный поиск и сопровождение.
+    Вместо сопоставления шаблонов ищет пиксельный кластер, который значительно
+    ярче или темнее своего локального фона. Позиция измеряется центроидом кластера.
+    Движение предсказывается фильтром Калмана с моделью постоянной скорости.
+
+    Секция TOML: [irst_tracking].
+    """
+
+    # --- Детектор локального контраста ---
+    filter_kernel: int = 3
+    """Размер внутреннего окна для поиска локального максимума/минимума (пиксели)."""
+    background_kernel: int = 11
+    """Размер внешнего окна для оценки локального фона (пиксели, нечётное число)."""
+    contrast_threshold: float = 12.0
+    """Минимальный контраст (в единицах 0–255), при котором пиксель считается частью цели."""
+    min_blob_area: int = 1
+    """Минимальная площадь кластера-кандидата в пикселях."""
+    max_blob_area: int = 200
+    """Максимальная площадь кластера-кандидата в пикселях."""
+
+    # --- Фильтр Калмана (модель постоянной скорости: cx, cy, vx, vy) ---
+    kalman_process_noise_pos: float = 0.5
+    """Шум процесса по позиции (насколько точно модель описывает движение)."""
+    kalman_process_noise_vel: float = 2.0
+    """Шум процесса по скорости (насколько допускаем ускорение цели)."""
+    kalman_measurement_noise: float = 1.5
+    """Шум измерения (ошибка определения центроида blob в пикселях)."""
+
+    # --- Зона захвата (gate) ---
+    min_gate: int = 25
+    """Минимальный радиус поиска кандидата вокруг прогноза Калмана (пиксели)."""
+    gate_growth: int = 4
+    """Расширение радиуса поиска за каждый пропущенный кадр (пиксели/кадр)."""
+    max_gate: int = 120
+    """Максимальный радиус поиска (физический предел, пиксели)."""
+    max_speed_px_per_frame: float = 8.0
+    """Жёсткий физический предел скорости объекта (пиксели/кадр).
+    Кандидат за пределами last_good_bbox + max_speed * lost_frames отклоняется."""
+
+    # --- Устойчивость к потере ---
+    max_lost_frames: int = 30
+    """Максимальный пропуск кадров без обнаружения, после которого трекер уходит в IDLE."""
+
+    # --- Обработка замутнения ---
+    blur_hold_enabled: bool = True
+    """Включить режим удержания прогноза при размытом кадре."""
+    blur_sharpness_drop_ratio: float = 0.60
+    """Если резкость кадра упала ниже baseline * ratio, считаем кадр замутнённым."""
+
+    # --- Выбор цели кликом ---
+    click_search_radius: int = 60
+    """Радиус поиска ближайшего blob к точке клика (пиксели)."""
+    click_fallback_size: int = 12
+    """Размер запасного бокса, если рядом с кликом нет кандидатов."""
+
+
 @dataclass
 class VisualizationConfig:
     """Параметры отрисовки поверх кадра."""
@@ -220,6 +280,7 @@ class TrackerPreset:
     pipeline_kind: str = "manual_click_classical"
     opencv_tracker: OpenCVTrackerConfig | None = None
     yolo_tracker: YoloTrackerConfig | None = None
+    irst_tracker: IrstTrackerConfig | None = None
     neural: NeuralConfig | None = None
 
 
@@ -365,6 +426,11 @@ def _build_preset_record(path: Path) -> _PresetRecord:
     if isinstance(yolo_tracking_data, dict):
         yolo_tracker = YoloTrackerConfig(**dict(yolo_tracking_data))
 
+    irst_tracking_data = data.get("irst_tracking")
+    irst_tracker: IrstTrackerConfig | None = None
+    if isinstance(irst_tracking_data, dict):
+        irst_tracker = IrstTrackerConfig(**dict(irst_tracking_data))
+
     neural_section = data.get("neural")
     neural = None
     if isinstance(neural_section, dict) and neural_section:
@@ -384,6 +450,7 @@ def _build_preset_record(path: Path) -> _PresetRecord:
             pipeline_kind=pipeline_kind,
             opencv_tracker=opencv_tracker,
             yolo_tracker=yolo_tracker,
+            irst_tracker=irst_tracker,
             neural=neural,
         ),
         presentation=_build_presentation(preset_name, meta),

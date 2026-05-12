@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from ...config import ClickSelectionConfig, NeuralConfig, OpenCVTrackerConfig, YoloTrackerConfig
+from ...config import ClickSelectionConfig, IrstTrackerConfig, NeuralConfig, OpenCVTrackerConfig, YoloTrackerConfig
 from ...domain.models import BoundingBox, DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot
 from .base_target_tracker import BaseSingleTargetTracker
+from .irst_contrast_target_tracker import IrstSingleTargetTracker
 from .nn_yolo_target_tracker import YoloTrackSingleTargetTracker
 from .opencv_template_point_target_tracker import ClickToTrackSingleTargetTracker
 from .target_tracker_type import TargetTrackerType
@@ -19,7 +20,7 @@ class TargetTrackerManager:
     def __init__(
         self,
         tracker: TargetTrackerInput,
-        tracker_config: OpenCVTrackerConfig | YoloTrackerConfig,
+        tracker_config: OpenCVTrackerConfig | YoloTrackerConfig | IrstTrackerConfig,
         click_config: ClickSelectionConfig,
         neural_config: NeuralConfig | None = None,
     ) -> None:
@@ -77,7 +78,7 @@ class TargetTrackerManager:
     def _build_tracker(
         cls,
         tracker: TargetTrackerInput,
-        tracker_config: OpenCVTrackerConfig | YoloTrackerConfig,
+        tracker_config: OpenCVTrackerConfig | YoloTrackerConfig | IrstTrackerConfig,
         click_config: ClickSelectionConfig,
         neural_config: NeuralConfig | None,
     ) -> BaseSingleTargetTracker:
@@ -98,6 +99,13 @@ class TargetTrackerManager:
             if neural_config is None:
                 raise ValueError("NN YOLO tracker requires neural config.")
             return YoloTrackSingleTargetTracker(tracker_config, click_config, neural_config)
+        if tracker_type == TargetTrackerType.IRST_CONTRAST:
+            if not isinstance(tracker_config, IrstTrackerConfig):
+                raise TypeError(
+                    f"IRST tracker requires IrstTrackerConfig, "
+                    f"got {type(tracker_config).__name__}."
+                )
+            return IrstSingleTargetTracker(tracker_config, click_config)
         raise ValueError(f"Unsupported target tracker type: {tracker_type!r}.")
 
     @staticmethod

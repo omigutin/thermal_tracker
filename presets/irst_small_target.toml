@@ -1,0 +1,160 @@
+# Пресет для маленькой тепловой цели на базе IRST-трекера.
+#
+# IRST — Infrared Search and Track / инфракрасный поиск и сопровождение.
+# Вместо сопоставления шаблонов (template matching) и оптического потока (LK optical flow)
+# ищет контрастный blob в локальном окне. Позиция измеряется центроидом blob,
+# движение предсказывается фильтром Калмана с моделью постоянной скорости.
+#
+# Рекомендуется для сценариев:
+# - малый объект (≤ 200px² blob-площадь);
+# - видимые изменения резкости / поворот камеры во время слежения;
+# - фон с текстурами, на которых шаблон плавает.
+
+[meta]
+id = "irst_small_target"
+title = "IRST Small Target"
+tooltip = "IRST-трекер для маленьких тепловых объектов."
+description = """
+Основан на детекторе локального контраста + фильтре Калмана.
+Не использует шаблоны, LK optical flow и phase correlation.
+Лучше работает при замутнении, повороте камеры и малом размере цели.
+"""
+
+[pipeline]
+kind = "manual_click_classical"
+
+[candidate_filtering]
+filters = ["area_aspect", "border_touch", "contrast"]
+
+[moving_area_detection]
+method = "opencv_mog2"
+
+[target_candidate_extraction]
+method = "opencv_connected_components"
+
+[target_recovery]
+# Используем IRST-recoverer — тот же локальный контраст, но с расширяющейся зоной.
+method = "irst_contrast"
+# Запускаем recovery достаточно быстро: IRST-трекер сам управляет max_lost_frames.
+min_lost_frames = 3
+# Базовый радиус зоны recovery; IRST-recoverer берёт search_padding и search_padding_growth.
+search_padding = 40
+# Медленное расширение — при скорости ~2px/кадр объект уходит ~60px за 30 кадров.
+search_padding_growth = 5
+# Для совместимости контракта TargetRecoveryConfig (LocalTemplateReacquirer их не использует).
+scales = [1.0]
+match_threshold = 0.0
+template_alpha = 0.0
+# IRST-recovery устойчивее шаблонного — 3 кадра подряд достаточно.
+confirm_frames = 3
+recovery_window_frames = 45
+
+[preprocessing]
+# Сохраняем sharpness_metric — IRST-трекер читает frame.sharpness для детекции замутнения.
+methods = [
+    "resize",
+    "gaussian_blur",
+    "median_blur",
+    "normalize_minmax",
+    "clahe_contrast",
+    "sharpness_metric",
+]
+# Стандартная ширина — IRST работает на уменьшенном кадре стабильно.
+resize_width = 960
+# Лёгкое сглаживание: убирает соль/перец, не уничтожает контраст маленькой цели.
+gaussian_kernel = 3
+# Медианный фильтр против одиночных горячих пикселей, создающих ложные blob-ы.
+median_kernel = 3
+# Умеренное усиление контраста: помогает детектору на слабоконтрастной цели.
+clahe_clip_limit = 2.0
+clahe_tile_grid_size = 8
+
+[global_motion]
+method = "opencv_phase_correlation"
+enabled = true
+downscale = 0.5
+blur_kernel = 7
+# Сдвиг остаётся валидным при умеренной надёжности.
+min_response = 0.025
+max_shift_ratio = 0.4
+
+# click_selection используется TargetTrackerManager при создании трекера,
+# но IrstSingleTargetTracker делает собственный поиск blob по клику через
+# click_search_radius / click_fallback_size из [irst_tracking].
+# Значения ниже — разумные дефолты для интерфейса.
+[click_selection]
+method = "opencv_click"
+search_radius = 60
+similarity_sigma = 1.5
+local_window_radius = 5
+min_tolerance = 8
+max_tolerance = 50
+min_component_area = 10
+max_component_fill = 0.45
+max_patch_span_ratio = 0.85
+max_refine_growth = 1.5
+retry_scale = 1.5
+max_retry_radius = 120
+padding = 4
+fallback_size = 12
+expansion_margin = 14
+background_ring = 8
+foreground_fraction = 0.5
+min_object_contrast = 5.0
+max_expanded_fill = 0.35
+max_expansion_ratio = 3.0
+
+[irst_tracking]
+# --- Детектор локального контраста ---
+# Размер внутреннего окна (объект): 3×3 — достаточно для blob в 1–10px.
+filter_kernel = 3
+# Размер окна фона: должен быть достаточно большим, чтобы охватить весь объект + кольцо фона.
+background_kernel = 11
+# Порог контраста (0–255): 12 хорошо отсекает тепловой шум и сохраняет малый объект.
+# Если ложных срабатываний много — повышайте; если цель теряется — снижайте.
+contrast_threshold = 12.0
+# Минимальная площадь blob: 1px — принимаем даже точечный объект.
+min_blob_area = 1
+# Максимальная площадь blob: 200px² — не захватываем крупные облачные структуры.
+max_blob_area = 200
+
+# --- Фильтр Калмана (модель постоянной скорости: cx, cy, vx, vy) ---
+# Шум позиции: небольшой — объект движется плавно, не скачет.
+kalman_process_noise_pos = 0.5
+# Шум скорости: умеренный — допускаем небольшое ускорение (манёвр).
+kalman_process_noise_vel = 2.0
+# Шум измерения: 1.5px — центроид blob определяется достаточно точно.
+kalman_measurement_noise = 1.5
+
+# --- Зона захвата (gate) ---
+# Начальный радиус gate: 20px — маленький объект не прыгает далеко за 1 кадр.
+min_gate = 20
+# Расширение при потере: +3px за кадр — за 10 кадров зона вырастает до 50px.
+gate_growth = 3
+# Жёсткий потолок: ограничиваем зону 100px, чтобы не захватить постороннее.
+max_gate = 100
+# Физический предел скорости: 6px/кадр (~95й перцентиль по данным тестов).
+# Объект за этим порогом физически не мог переместиться так быстро.
+max_speed_px_per_frame = 6.0
+
+# --- Устойчивость к потере ---
+# Ждём 30 кадров без обнаружения прежде чем объявить цель потерянной.
+max_lost_frames = 30
+
+# --- Обработка замутнения ---
+blur_hold_enabled = true
+# При падении резкости ниже 60% от baseline — считаем кадр замутнённым.
+blur_sharpness_drop_ratio = 0.60
+
+# --- Выбор цели кликом ---
+# Радиус поиска blob вокруг точки клика. Достаточно широкий, чтобы захватить
+# небольшое промахивание оператора.
+click_search_radius = 50
+# Размер fallback-бокса, если рядом с кликом нет контрастного blob.
+click_fallback_size = 10
+
+[visualization]
+show_search_region = true
+show_predicted_box = true
+show_global_motion = true
+line_thickness = 1
