@@ -1,12 +1,19 @@
-# Scenarios
+# Сценарии
 
-Scenarios are named assemblies of processing stages. They are selected by config, not hard-coded in GUI or runtime.
+Сценарий — это готовая сборка стадий обработки и правил состояния.
 
-Current names:
+Актуальные имена сценариев (по коду):
 
-- `nn_manual`
-- `nn_auto`
 - `opencv_manual`
 - `opencv_auto_motion`
+- `nn_manual`
+- `nn_auto`
 
-Use `thermal_tracker.scenarios.ScenarioFactory` to create a scenario by name.
+Псевдонимы `pipeline.kind`, которые маппятся в эти сценарии:
+
+- `manual_click_classical` -> `opencv_manual`
+- `auto_motion_tracking` -> `opencv_auto_motion`
+- `manual_click_neural` -> `nn_manual`
+- `auto_neural_detection` -> `nn_auto`
+
+Создание сценария выполняется через `ScenarioFactory`.
