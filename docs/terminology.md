@@ -1,20 +1,26 @@
-# Terminology
+# Термины
 
-`candidate` means "кандидат на цель" before operator choice or confirmation.
+## Кандидат
 
-`target` means "выбранная / сопровождаемая цель" after confirmation.
+Область на кадре, которая похожа на цель, но ещё не подтверждена.
 
-`NN` means Neural Network, "нейронная сеть".
+## Цель
 
-`OpenCV` means Open Source Computer Vision Library.
+Объект, который оператор выбрал и система сопровождает.
 
-## Naming Rules
+## Трекинг
 
-- Use `candidate` before target selection.
-- Use `target` after a target is selected for tracking.
-- Use `nn_` for neural-network implementations and scenarios.
-- Use `nnet_interface/` for the temporary NN integration interface.
-- Use `opencv_` only for implementations that directly use OpenCV or wrap an OpenCV algorithm.
-- Use `base_` for abstract contracts.
-- Use `no_` for no-op implementations.
-- Use `identity_` for pass-through implementations.
+Процесс удержания цели на последовательности кадров.
+
+## Recovery (восстановление)
+
+Попытка вернуть цель после временной потери.
+
+## Preset (пресет)
+
+Готовый набор настроек под определённый тип сцены.
+
+## IRST
+
+Infrared Search and Track — подход для тепловых целей,
+основанный на локальном контрасте и прогнозе движения.
