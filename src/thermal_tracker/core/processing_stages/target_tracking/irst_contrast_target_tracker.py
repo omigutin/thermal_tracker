@@ -86,12 +86,14 @@ class IrstSingleTargetTracker(BaseSingleTargetTracker):
 
         candidates = self._find_candidates(frame, search_region)
         if candidates:
-            # Выбираем blob, ближайший к точке клика
-            best_bbox, best_score = min(
+            # Выбираем blob по взвешенному критерию: score / (1 + dist/ref).
+            # Это даёт высококонтрастным blob-ам приоритет над ближними шумовыми.
+            # reference_dist — "нейтральная" дистанция, при которой distance-штраф ~1.
+            reference_dist = max(self.config.click_search_radius / 4.0, 1.0)
+            best_bbox, best_score = max(
                 candidates,
-                key=lambda c: math.hypot(
-                    c[0].center[0] - point[0],
-                    c[0].center[1] - point[1],
+                key=lambda c: c[1] / (
+                    1.0 + math.hypot(c[0].center[0] - point[0], c[0].center[1] - point[1]) / reference_dist
                 ),
             )
         else:

@@ -48,6 +48,10 @@ template_alpha = 0.0
 # IRST-recovery устойчивее шаблонного — 3 кадра подряд достаточно.
 confirm_frames = 3
 recovery_window_frames = 45
+# Физический gate recoverer-а: отклоняем blob-ы дальше max_speed * lost_frames * 1.5.
+# Должно совпадать с [irst_tracking].max_speed_px_per_frame.
+# Предотвращает уход трека на облака и посторонние горячие объекты при RECOVERING.
+max_speed_px_per_frame = 6.0
 
 [preprocessing]
 # Сохраняем sharpness_metric — IRST-трекер читает frame.sharpness для детекции замутнения.

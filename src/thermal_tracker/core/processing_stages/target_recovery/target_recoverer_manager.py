@@ -87,6 +87,7 @@ class TargetRecovererManager:
             return IrstContrastRecoverer(
                 search_padding=config.search_padding,
                 search_padding_growth=config.search_padding_growth,
+                max_speed_px_per_frame=config.max_speed_px_per_frame,
             )
         raise ValueError(f"Unsupported target recoverer type: {recoverer_type!r}.")
 

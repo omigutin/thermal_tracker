@@ -35,12 +35,14 @@ class IrstContrastRecoverer(BaseReacquirer):
         min_blob_area: int = 1,
         max_blob_area: int = 300,
         match_threshold: float = 0.0,  # не используется, оставлен для совместимости контракта
+        max_speed_px_per_frame: float = 0.0,  # физический gate: 0.0 = отключён
     ) -> None:
         self._search_padding = max(0, search_padding)
         self._search_padding_growth = max(0, search_padding_growth)
         self._contrast_threshold = contrast_threshold
         self._min_blob_area = min_blob_area
         self._max_blob_area = max_blob_area
+        self._max_speed_px_per_frame = max(0.0, max_speed_px_per_frame)
 
         # Память о последней надёжно сопровождавшейся цели
         self._polarity: str = "hot"          # "hot" или "cold"
@@ -78,11 +80,29 @@ class IrstContrastRecoverer(BaseReacquirer):
         if not candidates:
             return None
 
-        # Возвращаем кандидата, ближайшего к центру last_bbox
         ref_cx, ref_cy = shifted_bbox.center
-        best_bbox, _ = min(
+
+        # Физический gate: отклоняем blob-ы, которые не могли оказаться так далеко.
+        # Gate считается от shifted_bbox (last_bbox + коррекция на движение камеры).
+        # Логика симметрична IrstSingleTargetTracker._associate().
+        if self._max_speed_px_per_frame > 0.0:
+            max_physical_dist = self._max_speed_px_per_frame * max(lost_frames, 1) * 1.5
+            candidates = [
+                (bbox, score)
+                for bbox, score in candidates
+                if math.hypot(bbox.center[0] - ref_cx, bbox.center[1] - ref_cy) <= max_physical_dist
+            ]
+            if not candidates:
+                return None
+
+        # Выбираем кандидата по взвешенному критерию: score / (1 + dist/ref).
+        # Это защищает от выбора далёкого ложного blob только потому, что он "ближайший".
+        reference_dist = max(self._search_padding / 4.0, 1.0)
+        best_bbox, _ = max(
             candidates,
-            key=lambda c: math.hypot(c[0].center[0] - ref_cx, c[0].center[1] - ref_cy),
+            key=lambda c: c[1] / (
+                1.0 + math.hypot(c[0].center[0] - ref_cx, c[0].center[1] - ref_cy) / reference_dist
+            ),
         )
         return best_bbox
 

@@ -93,6 +93,9 @@ class TargetRecoveryConfig:
     template_alpha: float = 0.12  # Скорость обновления адаптивного шаблона при remember().
     confirm_frames: int = 3  # Сколько подряд согласованных кадров нужно для перехода RECOVERING -> TRACKING.
     recovery_window_frames: int = 30  # Максимальная длина окна RECOVERING; после него pipeline уходит в LOST.
+    max_speed_px_per_frame: float = 0.0  # Физический предел скорости объекта при recovery (px/кадр).
+    # Значение 0.0 = gate отключён (backward-compatible для opencv-пресетов).
+    # Для IRST-пресетов задаётся явно через [target_recovery] в TOML.
 
 
 @dataclass
