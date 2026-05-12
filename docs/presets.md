@@ -7,7 +7,7 @@
 Обычно есть секции:
 
 - `preprocessing` — подготовка кадра;
-- `global_motion` — секция настроек для стадии `frame_stabilization` (оценка сдвига камеры);
+- `global_motion` — оценка сдвига камеры;
 - `target_recovery` — восстановление после потери;
 - `click_selection` — стартовая инициализация по клику;
 - `opencv_tracking` или `irst_tracking` — параметры трекера.
