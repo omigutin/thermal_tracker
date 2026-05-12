@@ -1,44 +1,35 @@
-# Architecture
+# Архитектура
 
-Проект разделён на `core/server/client`, чтобы локальный стенд, будущий Orange Pi runtime и GUI-клиенты не мешали друг другу.
+Документ описывает систему с точки зрения ролей модулей и потока данных.
 
 ## Главная идея
 
-GUI не является центром архитектуры. Центр — поток кадров, команды оператора, сценарии обработки и результаты. Один и тот же core должен работать в desktop GUI, в локальном gateway-стенде и в headless runtime на Orange Pi.
+Центр системы — не интерфейс, а поток обработки кадров:
+
+1. входной кадр;
+2. подготовка и анализ;
+3. сопровождение цели;
+4. возврат результата оператору.
+
+Это позволяет запускать одно и то же ядро как в desktop-режиме, так и в серверном режиме.
 
 ## Слои
 
-- `thermal_tracker_core` содержит доменные модели, конфиги, сценарии, стадии обработки, адаптеры `connections` и `storage`.
-- `thermal_tracker_server` содержит `runtime_app`, gateway и процессы, которые живут рядом с локальной Shared Memory.
-- `thermal_tracker_client` содержит desktop GUI, web-ресурсы gateway и локальные отправители кадров для тестов.
-- `thermal_tracker` оставлен только как compatibility-слой для старых импортов.
+- `thermal_tracker.core` — доменная логика и алгоритмы.
+- `thermal_tracker.server` — серверный запуск, gateway и runtime worker.
+- `thermal_tracker.client` — GUI и web-интерфейс.
 
-## Dev vs Runtime
+## Поток данных (упрощённо)
 
-Dev launch использует `configs/dev.toml`, `run_desktop_client.py` и desktop GUI. Это режим для визуальной настройки, проверки пресетов и записи диагностических видео.
+Источник кадра → preprocessing → tracking/recovery → результат → клиент.
 
-Runtime/server launch использует `configs/runtime.toml` и `run_server.py`. Runtime по умолчанию ленивый: он собирает объекты, но не обязан сразу инициализировать сценарий с моделями.
+## Почему так разделено
 
-Shared Memory низкого уровня находится в:
+- проще тестировать алгоритмы отдельно от UI;
+- проще переносить runtime на другое устройство;
+- проще развивать отдельные части независимо.
 
-- `thermal_tracker_core/connections/frames/shared_memory_frame_reader.py`
-- `thermal_tracker_core/connections/commands/shared_memory_command_reader.py`
-- `thermal_tracker_core/connections/results/shared_memory_result_writer.py`
-- `thermal_tracker_core/connections/shared_memory/`
+## Про IRST
 
-## Gateway-Стенд
-
-Gateway живёт в `thermal_tracker_server.services.gateway_service`: принимает RAW Y8 кадры по HTTP, пишет их в Shared Memory, читает результаты runtime и отдаёт их Web UI.
-
-Web UI лежит отдельно в `thermal_tracker_client/web`. Это сознательное разделение: сервер обслуживает API и Shared Memory, клиентский интерфейс остаётся клиентским ресурсом.
-
-## Scenario Selection
-
-`ScenarioFactory` создаёт сценарии по имени из конфига:
-
-- `nn_manual`
-- `nn_auto`
-- `opencv_manual`
-- `opencv_auto_motion`
-
-Legacy `kind` в алгоритмических пресетах оставлены для совместимости.
+В ручном OpenCV-сценарии теперь возможен путь IRST:
+если пресет содержит `irst_tracking`, pipeline использует IRST-трекер.

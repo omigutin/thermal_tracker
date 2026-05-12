@@ -1,77 +1,36 @@
 # Thermal Tracker
 
-Python-проект для сопровождения объектов на тепловизионном видео.
+Thermal Tracker — это проект для сопровождения объектов на тепловизионном видео.
 
-Код разделён на три пакета:
+Если говорить просто: система получает видеокадры, ищет на них нужный объект, удерживает его в фокусе и сообщает результат оператору.
 
-- `thermal_tracker_core` — алгоритмы, сценарии, конфиги, доменные модели, `connections` и `storage`;
-- `thermal_tracker_server` — headless runtime, HTTP gateway и worker-процессы вокруг Shared Memory;
-- `thermal_tracker_client` — desktop GUI, web-клиент и локальные отправители кадров.
+## С чего начать
 
-Старый пакет `thermal_tracker` оставлен как compatibility-слой для старых импортов. Новый код лучше импортировать через `thermal_tracker_core`, `thermal_tracker_server` и `thermal_tracker_client`.
+1. Прочитайте [Быстрый старт](docs/quick_start.md).
+2. Посмотрите [Режимы запуска](docs/run_modes.md).
+3. Для настройки качества перейдите в [Пресеты](docs/presets.md).
+4. Чтобы понять внутреннюю логику, откройте [Стадии обработки](docs/processing_stages.md).
 
-## Запуск
+## Основные документы
 
-В корне оставлены только пользовательские входы:
+- [Быстрый старт](docs/quick_start.md)
+- [Режимы запуска](docs/run_modes.md)
+- [Конфигурация](docs/configuration.md)
+- [Пресеты](docs/presets.md)
+- [Стадии обработки](docs/processing_stages.md)
+- [Сценарии](docs/scenarios.md)
+- [IRST-трекинг](docs/irst_tracking.md)
+- [Архитектура](docs/architecture.md)
+- [Структура проекта](docs/project_structure.md)
+- [Термины](docs/terminology.md)
+- [Диагностика проблем](docs/troubleshooting.md)
 
-```powershell
-poetry run python run_server.py
-poetry run python run_desktop_client.py
-poetry run python run_web_client.py
-```
+## Коротко о составе проекта
 
-Что они делают:
+- `src/thermal_tracker/core` — логика обработки кадров, трекинга и восстановления цели.
+- `src/thermal_tracker/server` — серверный запуск, gateway и runtime worker.
+- `src/thermal_tracker/client` — desktop-интерфейс и web-клиент.
 
-- `run_server.py` по умолчанию запускает серверный стек: HTTP gateway + runtime worker.
-- `run_desktop_client.py` запускает desktop GUI для настройки и проверки пресетов.
-- `run_web_client.py` открывает браузерный клиент уже запущенного gateway.
+## Лицензия
 
-Технические режимы не исчезли, но убраны из корня:
-
-```powershell
-poetry run python run_server.py gateway
-poetry run python run_server.py runtime
-poetry run python run_server.py cleanup
-poetry run python -m thermal_tracker_client.services.network_video_sender "W:\path\to\video.mp4"
-poetry run python -m thermal_tracker_client.services.synthetic_network_sender
-```
-
-По умолчанию:
-
-- `run_server.py` читает `configs/runtime.toml`;
-- `run_desktop_client.py` читает `configs/dev.toml`;
-- runtime/dev-конфиги лежат в `configs/`;
-- алгоритмические пресеты лежат в `presets/`;
-- модели лежат в `models/`;
-- конфиги внешних трекеров лежат в `trackers/`.
-
-## Пресеты
-
-Основные имена:
-
-- `opencv_general`
-- `opencv_small_target`
-- `opencv_clutter`
-- `yolo_general`
-- `yolo_auto`
-
-## Структура
-
-- `src/thermal_tracker_core/domain` — модели данных и контракты.
-- `src/thermal_tracker_core/scenarios` — сборки режимов работы.
-- `src/thermal_tracker_core/processing_stages` — алгоритмические стадии.
-- `src/thermal_tracker_core/connections` — frames/commands/results и Shared Memory низкого уровня.
-- `src/thermal_tracker_core/nnet_interface` — временный интерфейс к NN-моделям.
-- `src/thermal_tracker_core/config` — загрузка TOML-конфигов и пресетов.
-- `src/thermal_tracker_core/storage` — интерфейсы и заготовки хранилища истории.
-- `src/thermal_tracker_server` — runtime, gateway и server-side процессы.
-- `src/thermal_tracker_client/gui` — desktop GUI.
-- `src/thermal_tracker_client/web` — статический Web UI gateway.
-- `src/thermal_tracker_client/services` — локальные отправители и стенды.
-
-## Документация
-
-- [Architecture](docs/architecture.md)
-- [Terminology](docs/terminology.md)
-- [Project Structure](docs/project_structure.md)
-- [Shared Memory Gateway](docs/shared_memory_gateway.md)
+MIT.
