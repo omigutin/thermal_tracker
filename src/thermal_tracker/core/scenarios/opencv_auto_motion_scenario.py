@@ -19,11 +19,11 @@ import numpy as np
 from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, MotionDetectionResult, ProcessedFrame
 from ..domain.runtime import AutoScenarioStepResult, SessionRuntimeState
-from ..processing_stages.candidate_filtering import CandidateFilterManager
-from ..processing_stages.moving_area_detection import MovingAreaDetectorManager
-from ..processing_stages.target_candidate_extraction import TargetCandidateExtractorManager
-from ..processing_stages.frame_preprocessing import FramePreprocessorManager
-from ..processing_stages.frame_stabilization import FrameStabilizerManager
+from ..stages.candidate_filtering import CandidateFilterManager
+from ..stages.moving_area_detection import MovingAreaDetectorManager
+from ..stages.target_candidate_extraction import TargetCandidateExtractorManager
+from ..stages.frame_preprocessing import FramePreprocessorManager
+from ..stages.frame_stabilization import FrameStabilizerManager
 
 
 class AutoMotionTrackingPipeline:

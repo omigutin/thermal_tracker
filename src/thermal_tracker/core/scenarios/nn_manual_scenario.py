@@ -11,12 +11,12 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
-from ..processing_stages.target_tracking.target_tracker_type import TargetTrackerType
+from ..stages.target_tracking.target_tracker_type import TargetTrackerType
 from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
-from ..processing_stages.frame_preprocessing import FramePreprocessorManager
-from ..processing_stages.frame_stabilization import FrameStabilizerManager
-from ..processing_stages.target_tracking import TargetTrackerManager
+from ..stages.frame_preprocessing import FramePreprocessorManager
+from ..stages.frame_stabilization import FrameStabilizerManager
+from ..stages.target_tracking import TargetTrackerManager
 
 
 class ManualClickNeuralPipeline:

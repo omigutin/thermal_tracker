@@ -25,7 +25,7 @@ kind = "manual_click_neural"
 # Тяжёлый шумоподав и CLAHE не нужны — модель работает с менее обработанной картинкой.
 methods = [
     "resize",
-    "normalize_minmax",
+    "minmax_normalize",
     "gradient",
     "sharpness_metric",
 ]

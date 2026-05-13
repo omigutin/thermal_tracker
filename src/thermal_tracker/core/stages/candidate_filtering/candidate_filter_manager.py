@@ -50,11 +50,11 @@ from collections.abc import Sequence
 from typing import TypeAlias
 
 from ...domain.models import DetectedObject, GlobalMotion, ProcessedFrame
-from .area_aspect_candidate_filter import AreaAspectCandidateFilter
-from .base_candidate_filter import BaseCandidateFilter
-from .border_touch_candidate_filter import BorderTouchCandidateFilter
+from .filters.area_aspect_candidate_filter import AreaAspectCandidateFilter
+from .filters.base_candidate_filter import BaseCandidateFilter
+from .filters.border_touch_candidate_filter import BorderTouchCandidateFilter
 from .candidate_filter_type import CandidateFilterType
-from .contrast_candidate_filter import ContrastCandidateFilter
+from .filters.contrast_candidate_filter import ContrastCandidateFilter
 
 
 CandidateFilterInput: TypeAlias = CandidateFilterType | str
@@ -72,20 +72,13 @@ class CandidateFilterManager:
         CandidateFilterType.CONTRAST: ContrastCandidateFilter,
     }
 
-    def __init__(
-        self,
-        filters: Sequence[CandidateFilterInput],
-    ) -> None:
+    def __init__(self, filters: Sequence[CandidateFilterInput], ) -> None:
         """Инициализировать менеджер и подготовить фильтры к запуску."""
-
-        self._filters: tuple[BaseCandidateFilter, ...] = (
-            self._normalize_filters(filters)
-        )
+        self._filters: tuple[BaseCandidateFilter, ...] = tuple(self._normalize_filters(filters))
 
     @property
     def filters(self) -> tuple[BaseCandidateFilter, ...]:
         """Вернуть подготовленные экземпляры фильтров."""
-
         return self._filters
 
     @classmethod
@@ -142,21 +135,10 @@ class CandidateFilterManager:
             f"{tuple(item.name for item in CandidateFilterType)}."
         )
 
-    def filter(
-        self,
-        frame: ProcessedFrame,
-        objects: list[DetectedObject],
-        motion: GlobalMotion,
-    ) -> list[DetectedObject]:
+    def filter(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion, ) -> list[DetectedObject]:
         """Последовательно применить фильтры к кандидатам."""
-
         current = list(objects)
-
         for candidate_filter in self._filters:
-            current = candidate_filter.filter(
-                frame=frame,
-                objects=current,
-                motion=motion,
-            )
-
+            current = candidate_filter.filter(frame=frame, objects=current, motion=motion, )
         return current
+    

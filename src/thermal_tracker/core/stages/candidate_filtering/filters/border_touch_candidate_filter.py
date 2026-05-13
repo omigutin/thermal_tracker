@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
 from .base_candidate_filter import BaseCandidateFilter
 
 

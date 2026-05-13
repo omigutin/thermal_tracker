@@ -29,7 +29,7 @@ class PreprocessingConfig:
         "resize",
         "gaussian_blur",
         "median_blur",
-        "normalize_minmax",
+        "minmax_normalize",
         "clahe_contrast",
         "gradient",
         "sharpness_metric",

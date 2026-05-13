@@ -13,8 +13,8 @@ from dataclasses import replace
 import cv2
 import numpy as np
 
-from ...domain.models import FrameQuality, ProcessedFrame
-from .base_frame_preprocessor import BaseFramePreprocessor
+from .....domain.models import FrameQuality, ProcessedFrame
+from ..base_frame_preprocessor import BaseFramePreprocessor
 
 
 class SharpnessMetricFramePreprocessor(BaseFramePreprocessor):

@@ -19,8 +19,8 @@ from ..config import TrackerPreset, build_preset
 from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..nnet_interface import YoloNnetInterface
-from ..processing_stages.frame_preprocessing import FramePreprocessorManager
-from ..processing_stages.frame_stabilization import FrameStabilizerManager
+from ..stages.frame_preprocessing import FramePreprocessorManager
+from ..stages.frame_stabilization import FrameStabilizerManager
 
 
 class AutoNeuralDetectionPipeline:

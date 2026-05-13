@@ -18,7 +18,7 @@ kind = "auto_neural_detection"
 # Минимальная цепочка для neural-режима без CLAHE и blur.
 methods = [
     "resize",
-    "normalize_minmax",
+    "minmax_normalize",
     "gradient",
     "sharpness_metric",
 ]

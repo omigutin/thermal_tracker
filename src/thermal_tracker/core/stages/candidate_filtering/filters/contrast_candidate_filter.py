@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from ...domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
 from .base_candidate_filter import BaseCandidateFilter
 
 
@@ -24,7 +24,7 @@ class ContrastCandidateFilter(BaseCandidateFilter):
     def filter(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion) -> list[DetectedObject]:
         """ Удаляет объекты с недостаточным контрастом относительно фона. """
 
-        normalized = frame.normalized.astype(np.float32)
+        normalized = frame.normalized.astype(np.float32, copy=False)
         result: list[DetectedObject] = []
         for obj in objects:
             bbox = obj.bbox.clamp(normalized.shape)
@@ -34,6 +34,7 @@ class ContrastCandidateFilter(BaseCandidateFilter):
 
             ring_bbox = bbox.pad(self.border, self.border).clamp(normalized.shape)
             ring_patch = normalized[ring_bbox.y:ring_bbox.y2, ring_bbox.x:ring_bbox.x2]
+            # TODO: Внутри каждого объекта создаётся ring_mask. Если кандидатов мало — нормально. Если кандидатов десятки/сотни на кадр — это станет горячим местом.
             ring_mask = np.ones(ring_patch.shape, dtype=bool)
             y1 = bbox.y - ring_bbox.y
             y2 = y1 + bbox.height

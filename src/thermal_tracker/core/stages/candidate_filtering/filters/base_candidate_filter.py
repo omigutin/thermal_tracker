@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ...domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
 
 
 class BaseCandidateFilter(ABC):

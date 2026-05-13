@@ -9,8 +9,8 @@ from dataclasses import replace
 
 import cv2
 
-from ...domain.models import ProcessedFrame
-from .base_frame_preprocessor import BaseFramePreprocessor
+from .....domain.models import ProcessedFrame
+from ..base_frame_preprocessor import BaseFramePreprocessor
 
 
 class BilateralFramePreprocessor(BaseFramePreprocessor):

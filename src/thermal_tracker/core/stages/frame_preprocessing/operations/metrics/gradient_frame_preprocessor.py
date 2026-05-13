@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from ...domain.models import ProcessedFrame
-from .base_frame_preprocessor import BaseFramePreprocessor
-from .opencv_frame_preprocessing_utils import build_gradient
+from .....domain.models import ProcessedFrame
+from ..base_frame_preprocessor import BaseFramePreprocessor
+from ...opencv_frame_preprocessing_utils import build_gradient
 
 
 class GradientFramePreprocessor(BaseFramePreprocessor):

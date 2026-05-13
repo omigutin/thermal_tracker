@@ -18,7 +18,7 @@ class FramePreprocessorType(StrEnum):
     GAUSSIAN_BLUR = "gaussian_blur"  # Сглаживает gray гауссовым фильтром.
     MEDIAN_BLUR = "median_blur"  # Сглаживает gray медианным фильтром.
     BILATERAL = "bilateral"  # Сглаживает gray bilateral-фильтром, сохраняя границы объектов.
-    NORMALIZE_MINMAX = "normalize_minmax"  # Линейная нормализация gray -> normalized.
+    NORMALIZE_MINMAX = "minmax_normalize"  # Линейная нормализация gray -> normalized в диапазоне [0, 1].
     CLAHE_CONTRAST = "clahe_contrast"  # Усиливает локальный контраст в normalized через CLAHE.
     PERCENTILE_NORMALIZE = "percentile_normalize"  # Перцентильная нормализация gray -> normalized.
     GRADIENT = "gradient"  # Считает карту градиентов из normalized в gradient.

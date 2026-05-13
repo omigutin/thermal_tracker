@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ...domain.models import ProcessedFrame
+from ....domain.models import ProcessedFrame
 
 
 class BaseFramePreprocessor(ABC):

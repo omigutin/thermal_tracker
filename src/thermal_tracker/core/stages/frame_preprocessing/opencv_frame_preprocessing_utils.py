@@ -45,7 +45,7 @@ def build_gradient(gray: np.ndarray, blur_kernel: int = 3) -> np.ndarray:
     return cv2.normalize(gradient, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 
-def normalize_minmax(gray: np.ndarray) -> np.ndarray:
+def minmax_normalize(gray: np.ndarray) -> np.ndarray:
     """Простая нормализация яркости в диапазон 0..255."""
 
     return cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
