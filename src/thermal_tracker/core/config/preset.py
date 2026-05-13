@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 import tomllib
 
-from ..stages.candidate_filtering.config import CANDIDATE_FILTER_CONFIG_CLASSES, CandidateFilterConfig
+from ..stages.candidate_filtering import CANDIDATE_FILTER_CONFIG_CLASSES, CandidateFilterConfig
 from .stage_config import StageConfig
 from .stage_config_parser import StageConfigParser
 

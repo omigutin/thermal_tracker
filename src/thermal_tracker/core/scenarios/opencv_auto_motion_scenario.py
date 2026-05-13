@@ -35,7 +35,7 @@ class AutoMotionTrackingPipeline:
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.motion_detector = MovingAreaDetectorManager(self.preset.moving_area_detection.method)
         self.object_builder = TargetCandidateExtractorManager(self.preset.target_candidate_extraction.method)
-        self.false_target_filter = CandidateFilterManager(self.preset.candidate_filtering.runtime_operations)
+        self.false_target_filter = CandidateFilterManager(self.preset.candidate_filtering.enabled_operations)
 
         self.current_frame: ProcessedFrame | None = None
         self.current_motion: GlobalMotion = GlobalMotion()
@@ -68,7 +68,7 @@ class AutoMotionTrackingPipeline:
         self.current_motion = self.motion_estimator.estimate(self.current_frame)
         self.current_detection = self.motion_detector.detect(self.current_frame, self.current_motion)
         self.current_raw_objects = self.object_builder.build(self.current_frame, self.current_detection)
-        self.current_filtered_objects = self.false_target_filter.filter(
+        self.current_filtered_objects = self.false_target_filter.operation(
             self.current_frame,
             self.current_raw_objects,
             self.current_motion,

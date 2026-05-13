@@ -22,8 +22,8 @@ class StageConfig(Generic[OperationConfigT]):
             raise ValueError("Stage is enabled, but no operations are configured.")
 
     @property
-    def runtime_operations(self) -> tuple[OperationConfigT, ...]:
-        """Вернуть операции, которые должны попасть в runtime pipeline."""
+    def enabled_operations(self) -> tuple[OperationConfigT, ...]:
+        """Возвращает разрешённые операции, которые должны попасть в pipeline."""
         if not self.enabled:
             return ()
         return self.operations

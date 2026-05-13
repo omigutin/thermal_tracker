@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from ....config import PresetFieldReader
 from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
@@ -34,7 +34,7 @@ class AreaAspectCandidateFilterConfig:
             raise ValueError("max_aspect_ratio must be greater than or equal to 1.")
 
     @classmethod
-    def from_mapping(cls, values: dict[str, object], ) -> AreaAspectCandidateFilterConfig:
+    def from_mapping(cls, values: dict[str, object], ) -> Self:
         """Создать конфигурацию из сырых параметров пресета."""
         reader = PresetFieldReader(owner=str(cls.filter_type), values=values, )
         kwargs: dict[str, object] = {}

@@ -75,21 +75,21 @@ from .operations.base_candidate_filter import BaseCandidateFilter
 class CandidateFilterManager:
     """Менеджер атомарных фильтров для отсеивания кандидатов."""
 
-    def __init__(self, filters: Sequence[CandidateFilterConfig], ) -> None:
+    def __init__(self, operations: Sequence[CandidateFilterConfig], ) -> None:
         """Инициализировать менеджер и подготовить фильтры к запуску."""
-        self._filters: tuple[BaseCandidateFilter, ...] = (CandidateFilterFactory.build_many(filters))
+        self._operations: tuple[BaseCandidateFilter, ...] = (CandidateFilterFactory.build_many(operations))
 
     @property
-    def filters(self) -> tuple[BaseCandidateFilter, ...]:
+    def operations(self) -> tuple[BaseCandidateFilter, ...]:
         """Вернуть подготовленные экземпляры фильтров."""
-        return self._filters
+        return self._operations
 
-    def filter(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion, ) -> list[DetectedObject]:
+    def operation(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion, ) -> list[DetectedObject]:
         """Последовательно применить фильтры к кандидатам."""
 
         current = list(objects)
 
-        for candidate_filter in self._filters:
+        for candidate_filter in self._operations:
             current = candidate_filter.filter(frame=frame, objects=current, motion=motion, )
 
         return current
