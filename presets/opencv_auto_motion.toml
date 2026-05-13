@@ -45,8 +45,29 @@ method = "opencv_mog2"
 [target_candidate_extraction]
 method = "opencv_connected_components"
 
+#----------------------------------------- Отбраковка плохих кандидатов -----------------------------------------------#
 [candidate_filtering]
-filters = ["area_aspect", "border_touch", "contrast"]
+enabled = true
+
+[[candidate_filtering.operations]]
+type = "area_aspect"
+enabled = true
+min_area = 24
+max_frame_fraction = 0.25
+max_aspect_ratio = 6.0
+
+[[candidate_filtering.operations]]
+type = "border_touch"
+enabled = true
+border_margin = 2
+
+[[candidate_filtering.operations]]
+type = "contrast"
+enabled = true
+min_contrast = 5.0
+border = 6
+min_background_pixels = 10
+#----------------------------------------------------------------------------------------------------------------------#
 
 [target_recovery]
 method = "local_template"

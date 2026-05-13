@@ -8,6 +8,10 @@ from functools import lru_cache
 from pathlib import Path
 import tomllib
 
+from ..stages.candidate_filtering.config import CANDIDATE_FILTER_CONFIG_CLASSES, CandidateFilterConfig
+from .stage_config import StageConfig
+from .stage_config_parser import StageConfigParser
+
 # Имя базового пресета, к которому откатываемся при сомнительном выборе.
 DEFAULT_PRESET_NAME = "opencv_general"
 # Корень проекта нужен, чтобы искать `presets/` независимо от текущей рабочей папки.
@@ -57,13 +61,6 @@ class GlobalMotionConfig:
     blur_kernel: int = 9
     min_response: float = 0.03
     max_shift_ratio: float = 0.35
-
-
-@dataclass
-class CandidateFilteringConfig:
-    """Параметры последовательной фильтрации кандидатов."""
-
-    filters: tuple[str, ...] = ("area_aspect", "border_touch", "contrast")
 
 
 @dataclass
@@ -277,7 +274,7 @@ class TrackerPreset:
     moving_area_detection: MovingAreaDetectionConfig
     target_candidate_extraction: TargetCandidateExtractionConfig
     target_recovery: TargetRecoveryConfig
-    candidate_filtering: CandidateFilteringConfig
+    candidate_filtering: StageConfig[CandidateFilterConfig]
     click_selection: ClickSelectionConfig
     visualization: VisualizationConfig
     pipeline_kind: str = "manual_click_classical"
@@ -333,19 +330,6 @@ def _normalize_neural_section(section: dict[str, object]) -> dict[str, object]:
     allowed_classes = normalized.get("allowed_classes")
     if allowed_classes is not None:
         normalized["allowed_classes"] = tuple(int(value) for value in allowed_classes)
-    return normalized
-
-
-def _normalize_candidate_filtering_section(section: dict[str, object]) -> dict[str, object]:
-    """Подготавливает список фильтров кандидатов перед созданием dataclass."""
-
-    normalized = dict(section)
-    filters = normalized.get("filters")
-    if filters is not None:
-        if isinstance(filters, str):
-            normalized["filters"] = (filters,)
-        else:
-            normalized["filters"] = tuple(str(value) for value in filters)
     return normalized
 
 
@@ -410,9 +394,13 @@ def _build_preset_record(path: Path) -> _PresetRecord:
     target_recovery = TargetRecoveryConfig(
         **_normalize_target_recovery_section(dict(data.get("target_recovery", {})))
     )
-    candidate_filtering = CandidateFilteringConfig(
-        **_normalize_candidate_filtering_section(dict(data.get("candidate_filtering", {})))
+
+    candidate_filtering = StageConfigParser.parse(
+        section=dict(data.get("candidate_filtering", {})),
+        stage_name="candidate_filtering",
+        config_classes=CANDIDATE_FILTER_CONFIG_CLASSES,
     )
+
     click_selection = ClickSelectionConfig(**dict(data.get("click_selection", {})))
     visualization = VisualizationConfig(**dict(data.get("visualization", {})))
     pipeline_kind = str(pipeline.get("kind") or "manual_click_classical").strip() or "manual_click_classical"

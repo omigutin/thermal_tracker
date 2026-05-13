@@ -8,7 +8,7 @@ import cv2
 
 from .....domain.models import ProcessedFrame
 from ..base_frame_preprocessor import BaseFramePreprocessor
-from ...opencv_frame_preprocessing_utils import make_odd
+from ...utils import make_odd
 
 
 class GaussianBlurFramePreprocessor(BaseFramePreprocessor):

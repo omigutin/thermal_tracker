@@ -18,8 +18,29 @@ description = """
 # Явно говорим, какой сценарий должен быть собран для этого пресета.
 kind = "manual_click_classical"
 
+#----------------------------------------- Отбраковка плохих кандидатов -----------------------------------------------#
 [candidate_filtering]
-filters = ["area_aspect", "border_touch", "contrast"]
+enabled = true
+
+[[candidate_filtering.operations]]
+type = "area_aspect"
+enabled = true
+min_area = 24
+max_frame_fraction = 0.25
+max_aspect_ratio = 6.0
+
+[[candidate_filtering.operations]]
+type = "border_touch"
+enabled = true
+border_margin = 2
+
+[[candidate_filtering.operations]]
+type = "contrast"
+enabled = true
+min_contrast = 5.0
+border = 6
+min_background_pixels = 10
+#----------------------------------------------------------------------------------------------------------------------#
 
 [moving_area_detection]
 method = "opencv_mog2"

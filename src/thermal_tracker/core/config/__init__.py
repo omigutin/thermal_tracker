@@ -31,8 +31,10 @@ from .preset import (
     get_available_preset_names,
     get_preset_presentation,
 )
+from .preset_field_reader import PresetFieldReader
 
-__all__ = [
+__all__ = (
+    "PresetFieldReader",
     "AVAILABLE_PRESETS",
     "AppConfig",
     "ClickSelectionConfig",
@@ -60,4 +62,4 @@ __all__ = [
     "get_available_preset_names",
     "get_preset_presentation",
     "load_app_config",
-]
+)

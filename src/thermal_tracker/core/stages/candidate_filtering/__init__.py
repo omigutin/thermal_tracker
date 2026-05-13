@@ -1,14 +1,11 @@
 """
-    Публичный API стадии фильтрации кандидатов.
-    Наружу экспортируются только:
-        - CandidateFilterType: публичные идентификаторы доступных фильтров;
-        - CandidateFilterManager: менеджер создания и последовательного запуска фильтров.
-    Конкретные реализации фильтров считаются внутренними деталями модуля.
-    Внешний код и пресеты не должны импортировать их напрямую.
+    Стадия фильтрации кандидатов на цель.
+    Пакет содержит конфигурацию, фабрику, менеджер и атомарные фильтры
+    для последовательного отсеивания ложных кандидатов.
 """
 
-from .candidate_filter_manager import CandidateFilterManager
-from .candidate_filter_type import CandidateFilterType
+from .manager import CandidateFilterManager
+from .type import CandidateFilterType
 
 __all__ = (
     "CandidateFilterManager",

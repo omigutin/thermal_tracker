@@ -1,7 +1,7 @@
 """Публичный API стадии предобработки кадра."""
 
-from .frame_preprocessor_manager import FramePreprocessorManager
-from .frame_preprocessor_type import FramePreprocessorType
+from .manager import FramePreprocessorManager
+from .type import FramePreprocessorType
 
 __all__ = (
     "FramePreprocessorManager",
