@@ -45,3 +45,6 @@ config_path = "trackers/botsort.yaml"
 [history]
 enabled = false
 store = "null"
+
+[diagnostics]
+enabled = false
