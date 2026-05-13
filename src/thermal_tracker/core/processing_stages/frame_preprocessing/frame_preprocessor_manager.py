@@ -64,14 +64,11 @@ class FramePreprocessorManager:
     ) -> None:
         """Подготовить список операций к запуску по конфигурации пресета."""
 
-        self._preprocessors: tuple[BaseFramePreprocessor, ...] = tuple(
-            self._build_preprocessor(method, config) for method in methods
-        )
+        self._preprocessors: tuple[BaseFramePreprocessor, ...] = tuple(self._build_preprocessor(method, config) for method in methods)
 
     @property
     def preprocessors(self) -> tuple[BaseFramePreprocessor, ...]:
         """Готовые экземпляры атомарных операций в порядке применения."""
-
         return self._preprocessors
 
     def process(self, raw: np.ndarray) -> ProcessedFrame:
@@ -103,11 +100,7 @@ class FramePreprocessorManager:
         )
 
     @classmethod
-    def _build_preprocessor(
-        cls,
-        method: FramePreprocessorInput,
-        config: PreprocessingConfig,
-    ) -> BaseFramePreprocessor:
+    def _build_preprocessor(cls, method: FramePreprocessorInput, config: PreprocessingConfig, ) -> BaseFramePreprocessor:
         """Создать экземпляр атомарной операции по описанию из пресета."""
 
         method_type = cls._normalize_method_type(method)

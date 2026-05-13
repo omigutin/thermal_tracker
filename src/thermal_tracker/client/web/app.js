@@ -288,6 +288,10 @@ async function loadSelectedVideo({ autoplay, sendFirstFrame }) {
   setEmpty(`Загрузка: ${file.name}`);
 
   await waitForVideoEvent("loadedmetadata");
+  // Синхронно подтягиваем content rect и canvas под новый ролик ДО того, как
+  // пользователь успеет кликнуть. Закрывает race condition между переключением
+  // ролика и первым image.onload в refreshFrame.
+  applyContentRectToCanvas();
   timeline.max = Number.isFinite(sourceVideo.duration) ? String(sourceVideo.duration) : "0";
   timeline.value = "0";
   sourceVideo.currentTime = 0;
@@ -476,14 +480,42 @@ async function sendCurrentFrame() {
   }
 }
 
+function updateLastUploadContentRect() {
+  // Единственный источник истины для координатного пространства, в котором
+  // живёт сервер. Считается синхронно от текущего source video, не зависит от
+  // image.onload и от isSending guard в sendCurrentFrame.
+  const sourceWidth = sourceVideo.videoWidth || TARGET_WIDTH;
+  const sourceHeight = sourceVideo.videoHeight || TARGET_HEIGHT;
+  lastUploadContentRect = containRect(sourceWidth, sourceHeight, TARGET_WIDTH, TARGET_HEIGHT);
+}
+
+function applyContentRectToCanvas() {
+  // Синхронно подтягивает display state под lastUploadContentRect. Нужен,
+  // чтобы клик после переключения ролика мапился по актуальным размерам,
+  // а не по stale значениям от прошлого ролика или от init.
+  updateLastUploadContentRect();
+  displayedContentRect = { ...lastUploadContentRect };
+  if (
+    displayCanvas.width !== lastUploadContentRect.width ||
+    displayCanvas.height !== lastUploadContentRect.height
+  ) {
+    displayCanvas.width = lastUploadContentRect.width;
+    displayCanvas.height = lastUploadContentRect.height;
+  }
+  // Очищаем canvas, чтобы кадр предыдущего ролика не вводил в заблуждение
+  // в окне до первого latest.jpg.
+  displayContext.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+  fitDisplayCanvasToStage();
+}
+
 function drawSourceVideoToUploadCanvas() {
   const sourceWidth = sourceVideo.videoWidth || TARGET_WIDTH;
   const sourceHeight = sourceVideo.videoHeight || TARGET_HEIGHT;
   uploadContext.fillStyle = "black";
   uploadContext.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
 
-  const rect = containRect(sourceWidth, sourceHeight, TARGET_WIDTH, TARGET_HEIGHT);
-  lastUploadContentRect = rect;
+  updateLastUploadContentRect();
+  const rect = lastUploadContentRect;
   uploadContext.imageSmoothingEnabled = true;
   uploadContext.drawImage(
     sourceVideo,
@@ -845,11 +877,28 @@ async function onCanvasClick(event) {
   if (selectedIndex < 0) {
     return;
   }
+  // Страховка: синхронно обновляем lastUploadContentRect под текущий source
+  // video перед расчётом координат. Не зависит от isSending guard в
+  // sendCurrentFrame, поэтому корректные координаты получаются даже если
+  // параллельно идёт другая отправка кадра.
+  updateLastUploadContentRect();
+
   const rect = displayCanvas.getBoundingClientRect();
-  const scaleX = displayCanvas.width / rect.width;
-  const scaleY = displayCanvas.height / rect.height;
-  const x = Math.round(displayedContentRect.x + (event.clientX - rect.left) * scaleX);
-  const y = Math.round(displayedContentRect.y + (event.clientY - rect.top) * scaleY);
+  const scaleX = lastUploadContentRect.width / rect.width;
+  const scaleY = lastUploadContentRect.height / rect.height;
+  const x = Math.round(lastUploadContentRect.x + (event.clientX - rect.left) * scaleX);
+  const y = Math.round(lastUploadContentRect.y + (event.clientY - rect.top) * scaleY);
+
+  // Временная диагностика на время проверки фикса. Уберём после подтверждения.
+  console.log("[click->frame]", {
+    cssX: event.clientX - rect.left,
+    cssY: event.clientY - rect.top,
+    cssRect: { width: rect.width, height: rect.height },
+    canvas: { width: displayCanvas.width, height: displayCanvas.height },
+    upload: { ...lastUploadContentRect },
+    frame: { x, y },
+  });
+
   await sendCurrentFrame();
   await fetch("/api/commands/click", {
     method: "POST",

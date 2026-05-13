@@ -229,8 +229,4 @@ __marimo__/
 /models/yolo26n.pt
 /models/yolo26s.pt
 /models/yolo26x.pt
-/plans/
-check_stage1_result.txt
-check_stage2_result.txt
-check_stage1.py
-check_stage2.py
+ 
