@@ -20,45 +20,45 @@ class CandidateFilterFactory:
     """
 
     @classmethod
-    def build_many(cls, filters: Sequence[CandidateFilterConfig]) -> tuple[BaseCandidateFilter, ...]:
+    def build_many(cls, operations: Sequence[CandidateFilterConfig]) -> tuple[BaseCandidateFilter, ...]:
         """Создать набор активных фильтров в исходном порядке."""
 
         result: list[BaseCandidateFilter] = []
 
-        for candidate_filter_config in filters:
-            built_filter = cls.build(candidate_filter_config)
+        for operation in operations:
+            built_filter = cls.build(operation)
             if built_filter is not None:
                 result.append(built_filter)
 
         return tuple(result)
 
     @classmethod
-    def build(cls, filter_config: CandidateFilterConfig) -> BaseCandidateFilter | None:
+    def build(cls, operation_config: CandidateFilterConfig) -> BaseCandidateFilter | None:
         """Создать один runtime-фильтр из конфигурации фильтра."""
-        cls._validate_filter_config(filter_config)
-        if not filter_config.enabled:
+        cls._validate_operation_config(operation_config)
+        if not operation_config.enabled:
             return None
-        return cls._build_runtime_filter(filter_config)
+        return cls._build_runtime_filter(operation_config)
 
     @classmethod
-    def _build_runtime_filter(cls, filter_config: CandidateFilterConfig) -> BaseCandidateFilter:
+    def _build_runtime_filter(cls, operation_config: CandidateFilterConfig) -> BaseCandidateFilter:
         """Создать runtime-фильтр по конкретному типу конфигурации."""
-        if isinstance(filter_config, AreaAspectCandidateFilterConfig):
-            return AreaAspectCandidateFilter(config=filter_config)
-        if isinstance(filter_config, BorderTouchCandidateFilterConfig):
-            return BorderTouchCandidateFilter(config=filter_config)
-        if isinstance(filter_config, ContrastCandidateFilterConfig):
-            return ContrastCandidateFilter(config=filter_config)
-        cls._raise_invalid_config(filter_config)
+        if isinstance(operation_config, AreaAspectCandidateFilterConfig):
+            return AreaAspectCandidateFilter(config=operation_config)
+        if isinstance(operation_config, BorderTouchCandidateFilterConfig):
+            return BorderTouchCandidateFilter(config=operation_config)
+        if isinstance(operation_config, ContrastCandidateFilterConfig):
+            return ContrastCandidateFilter(config=operation_config)
+        cls._raise_invalid_config(operation_config)
 
     @staticmethod
-    def _validate_filter_config(filter_config: CandidateFilterConfig) -> None:
+    def _validate_operation_config(operation_config: CandidateFilterConfig) -> None:
         """Проверить, что фабрика поддерживает переданную конфигурацию."""
-        if isinstance(filter_config, tuple(CANDIDATE_FILTER_CONFIG_CLASSES.values())):
+        if isinstance(operation_config, tuple(CANDIDATE_FILTER_CONFIG_CLASSES.values())):
             return
-        CandidateFilterFactory._raise_invalid_config(filter_config)
+        CandidateFilterFactory._raise_invalid_config(operation_config)
 
     @staticmethod
-    def _raise_invalid_config(filter_config: object) -> NoReturn:
+    def _raise_invalid_config(operation_config: object) -> NoReturn:
         """Выбросить ошибку неподдерживаемой конфигурации фильтра."""
-        raise TypeError(f"Unsupported candidate filter config: {type(filter_config).__name__!r}.")
+        raise TypeError(f"Unsupported candidate filter config: {type(operation_config).__name__!r}.")
