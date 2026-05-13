@@ -13,6 +13,7 @@ from thermal_tracker.core.connections.shared_memory import SharedMemoryFrame
 from thermal_tracker.core.connections.shared_memory.protocol import now_ns
 from thermal_tracker.core.domain.models import BoundingBox, GlobalMotion, TrackSnapshot
 from thermal_tracker.core.domain.runtime import ScenarioStepResult, SessionRuntimeState
+from thermal_tracker.core.diagnostic_writer import create_diagnostic_builder
 from thermal_tracker.core.scenarios import default_preset_for_scenario
 from thermal_tracker.core.storage import create_history_store
 
@@ -30,6 +31,11 @@ class RuntimeApp:
     preset_name_override: str | None = None
     neural_model_path_override: str | None = None
     queued_runtime_command: object | None = None
+
+    def __post_init__(self) -> None:
+        """Создает билдер диагностики по флагу из runtime-конфига."""
+
+        self._diagnostic_builder = create_diagnostic_builder(self.config.diagnostics.enabled)
 
     def initialize_scenario(self) -> object:
         if self.scenario is None:
@@ -67,9 +73,12 @@ class RuntimeApp:
         scenario = self.initialize_scenario()
         frame_metadata = getattr(self.frame_reader, "last_frame", None)
         started_ns = now_ns()
+        frame_id = int(getattr(frame_metadata, "frame_id", self.runtime_state.frame_index + 1))
+        self._diagnostic_builder.start_frame(frame_id)
         step_result = scenario.process_next_raw_frame(raw_frame, self.runtime_state)
+        diagnostics = self._diagnostic_builder.finalize_frame()
         finished_ns = now_ns()
-        payload = self._build_result_payload(step_result, frame_metadata, started_ns, finished_ns)
+        payload = self._build_result_payload(step_result, frame_metadata, started_ns, finished_ns, diagnostics)
         self.result_writer.write(payload)
         return payload
 
@@ -150,6 +159,7 @@ class RuntimeApp:
         frame_metadata: SharedMemoryFrame | None,
         started_ns: int,
         finished_ns: int,
+        diagnostics: object | None,
     ) -> dict[str, object]:
         """Собирает JSON-результат runtime-шагa для Shared Memory/Web."""
 
@@ -162,6 +172,9 @@ class RuntimeApp:
             "snapshot": _snapshot_to_dict(snapshot),
             "frame_shape": list(step_result.frame.bgr.shape),
         }
+        if diagnostics is not None:
+            payload["diagnostics"] = diagnostics.to_dict()
+
         if frame_metadata is not None:
             payload.update(
                 {

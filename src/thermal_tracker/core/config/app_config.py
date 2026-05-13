@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import TypeVar
 import tomllib
@@ -76,6 +76,11 @@ class HistoryConfig:
 
 
 @dataclass(frozen=True)
+class DiagnosticsConfig:
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
 class RuntimeConfig:
     app: AppConfig
     connections: ConnectionsConfig
@@ -83,7 +88,8 @@ class RuntimeConfig:
     model: ModelConfig
     tracker: TrackerRunConfig
     history: HistoryConfig
-    source_path: Path
+    diagnostics: DiagnosticsConfig = field(default_factory=DiagnosticsConfig)
+    source_path: Path = Path(".")
 
 
 def _resolve_path(config_path: str | Path) -> Path:
@@ -120,5 +126,6 @@ def load_app_config(config_path: str | Path) -> RuntimeConfig:
         model=_build_dataclass(ModelConfig, _as_table(data.get("model"))),
         tracker=_build_dataclass(TrackerRunConfig, _as_table(data.get("tracker"))),
         history=_build_dataclass(HistoryConfig, _as_table(data.get("history"))),
+        diagnostics=_build_dataclass(DiagnosticsConfig, _as_table(data.get("diagnostics"))),
         source_path=path,
     )
