@@ -1,67 +1,3 @@
-"""
-    Менеджер фильтров кандидатов.
-    Класс отвечает за последовательный запуск одного или нескольких фильтров
-    кандидатов на цель.
-
-    Основная задача менеджера:
-        1. Принять описание фильтров при инициализации.
-        2. Передать создание фильтров в CandidateFilterFactory.
-        3. Хранить готовые фильтры в неизменяемом порядке.
-        4. Последовательно применять фильтры к списку обнаруженных объектов.
-
-    Поддерживаемые варианты входных фильтров:
-
-        1. CandidateFilterType:
-            Менеджер создаст фильтр по enum-значению.
-
-            CandidateFilterManager(
-                operations=(
-                    CandidateFilterType.AREA_ASPECT,
-                    CandidateFilterType.BORDER_TOUCH,
-                    CandidateFilterType.CONTRAST,
-                ),
-            )
-
-        2. str:
-            Менеджер преобразует строку в CandidateFilterType, а затем создаст
-            соответствующий фильтр.
-
-            Поддерживаются строки по value:
-                "area_aspect"
-                "border_touch"
-                "contrast"
-
-            Также поддерживаются строки по name:
-                "AREA_ASPECT"
-                "BORDER_TOUCH"
-                "CONTRAST"
-
-            CandidateFilterManager(
-                operations=(
-                    "area_aspect",
-                    "border_touch",
-                    "contrast",
-                ),
-            )
-
-        3. CandidateFilterConfig:
-            Менеджер создаст фильтр по описанию из пресета.
-            Если enabled=False, фильтр не попадёт в runtime pipeline.
-
-            CandidateFilterManager(
-                operations=(
-                    CandidateFilterConfig(
-                        type=CandidateFilterType.CONTRAST,
-                        enabled=True,
-                        params={
-                            "min_contrast": 5.0,
-                            "border": 6,
-                        },
-                    ),
-                ),
-            )
-"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -73,23 +9,29 @@ from .operations.base_candidate_filter import BaseCandidateFilter
 
 
 class CandidateFilterManager:
-    """Менеджер атомарных фильтров для отсеивания кандидатов."""
+    """
+        Менеджер стадии фильтрации кандидатов.
+        Принимает упорядоченный набор конфигураций операций, делегирует их
+        сборку фабрике и последовательно применяет полученные runtime-фильтры
+        к списку кандидатов.
+        Менеджер не знает деталей TOML-пресета, не парсит сырые значения и
+        не создаёт фильтры вручную: всё это лежит на парсере пресета и фабрике.
+    """
 
-    def __init__(self, operations: Sequence[CandidateFilterConfig], ) -> None:
-        """Инициализировать менеджер и подготовить фильтры к запуску."""
+    def __init__(self, operations: Sequence[CandidateFilterConfig]) -> None:
+        """Подготовить runtime-фильтры из конфигураций операций."""
         self._operations: tuple[BaseCandidateFilter, ...] = (CandidateFilterFactory.build_many(operations))
 
     @property
     def operations(self) -> tuple[BaseCandidateFilter, ...]:
-        """Вернуть подготовленные экземпляры фильтров."""
+        """Вернуть подготовленные runtime-фильтры в порядке применения."""
         return self._operations
 
-    def operation(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion, ) -> list[DetectedObject]:
-        """Последовательно применить фильтры к кандидатам."""
+    def apply(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion) -> list[DetectedObject]:
+        """Последовательно применить runtime-фильтры к списку кандидатов."""
 
         current = list(objects)
-
-        for candidate_filter in self._operations:
-            current = candidate_filter.filter(frame=frame, objects=current, motion=motion, )
+        for runtime_operation in self._operations:
+            current = runtime_operation.filter(frame=frame, objects=current, motion=motion)
 
         return current

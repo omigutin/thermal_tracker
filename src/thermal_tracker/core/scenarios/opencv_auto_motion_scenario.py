@@ -68,7 +68,7 @@ class AutoMotionTrackingPipeline:
         self.current_motion = self.motion_estimator.estimate(self.current_frame)
         self.current_detection = self.motion_detector.detect(self.current_frame, self.current_motion)
         self.current_raw_objects = self.object_builder.build(self.current_frame, self.current_detection)
-        self.current_filtered_objects = self.false_target_filter.operation(
+        self.current_filtered_objects = self.false_target_filter.apply(
             self.current_frame,
             self.current_raw_objects,
             self.current_motion,

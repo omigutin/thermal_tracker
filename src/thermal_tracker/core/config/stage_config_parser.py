@@ -28,7 +28,21 @@ class StageConfigParser:
         stage_name: str,
         config_classes: Mapping[str, OperationConfigFactory[OperationConfigT]],
     ) -> StageConfig[OperationConfigT]:
-        """Преобразовать TOML-секцию стадии в строгую конфигурацию."""
+        """
+            Преобразовать TOML-секцию стадии в строгую конфигурацию.
+            Поведение по умолчанию:
+                - секции стадии нет в TOML или она пустая
+                    -> возвращается StageConfig(enabled=False, operations=()),
+                       стадия считается выключенной;
+                - секция есть, но ключ 'enabled' не задан
+                    -> стадия считается включённой (enabled=True),
+                       так как явное упоминание секции трактуется как намерение её использовать;
+                - enabled=True и список 'operations' пуст
+                    -> StageConfig.__post_init__ выбрасывает ValueError,
+                       чтобы поймать ошибочную конфигурацию на этапе загрузки пресета;
+                - значения параметров проверяются на тип через PresetFieldReader,
+                  смысловые ограничения - в __post_init__ конкретных config-классов.
+        """
 
         if not config_classes:
             raise RuntimeError(f"Stage {stage_name!r} has no registered operation config classes.")
