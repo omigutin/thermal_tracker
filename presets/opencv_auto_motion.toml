@@ -40,7 +40,7 @@ min_response = 0.2
 max_shift_ratio = 0.35
 
 [moving_area_detection]
-method = "opencv_mog2"
+method = "mog2"
 
 [target_candidate_extraction]
 method = "opencv_connected_components"

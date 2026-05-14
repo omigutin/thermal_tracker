@@ -11,8 +11,10 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
-from ..stages.target_tracking.target_tracker_type import TargetTrackerType
-from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot
+from ..stages.target_tracking.type import TargetTrackerType
+from ..domain.models import ProcessedFrame, TrackSnapshot
+from ..stages.candidate_formation.result import DetectedObject
+from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..stages.frame_preprocessing import FramePreprocessorManager
 from ..stages.frame_stabilization import FrameStabilizerManager
@@ -42,7 +44,7 @@ class ManualClickNeuralPipeline:
         )
 
         self.current_frame: ProcessedFrame | None = None
-        self.current_snapshot: TrackSnapshot = self.tracker.snapshot(GlobalMotion())
+        self.current_snapshot: TrackSnapshot = self.tracker.snapshot(FrameStabilizerResult())
 
     @property
     def preset_name(self) -> str:
@@ -78,7 +80,7 @@ class ManualClickNeuralPipeline:
         else:
             snapshot = self.current_snapshot
 
-        motion = self.motion_estimator.estimate(self.current_frame)
+        motion = self.motion_estimator.apply(self.current_frame)
         snapshot = self.tracker.update(self.current_frame, motion)
 
         if runtime.pending_click is not None:

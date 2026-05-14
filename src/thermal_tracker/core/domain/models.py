@@ -7,6 +7,8 @@ from enum import Enum
 
 import numpy as np
 
+from ..stages.frame_stabilization import FrameStabilizerResult
+
 
 class TrackerState(str, Enum):
     """Состояния жизненного цикла одной отслеживаемой цели.
@@ -120,49 +122,6 @@ class ProcessedFrame:
 
 
 @dataclass
-class GlobalMotion:
-    """Грубая оценка движения камеры между соседними кадрами."""
-
-    dx: float = 0.0
-    dy: float = 0.0
-    response: float = 0.0
-    valid: bool = False
-
-
-@dataclass
-class SelectionResult:
-    """Результат выбора объекта по клику."""
-
-    bbox: BoundingBox
-    confidence: float
-    polarity: str
-
-
-@dataclass
-class MotionDetectionResult:
-    """Результат стадии обнаружения движения."""
-
-    mask: np.ndarray
-    confidence_map: np.ndarray | None = None
-    source_name: str = ""
-    motion_score: float = 0.0
-
-
-@dataclass
-class DetectedObject:
-    """Объект, который собрали из маски движения или другого детектора."""
-
-    bbox: BoundingBox
-    area: int
-    confidence: float = 0.0
-    label: str = "object"
-    source: str = ""
-    mask: np.ndarray | None = None
-    track_id: int | None = None
-    class_id: int | None = None
-
-
-@dataclass
 class TrackSnapshot:
     """Снимок текущего состояния трекера для GUI и логики."""
 
@@ -173,5 +132,5 @@ class TrackSnapshot:
     search_region: BoundingBox | None
     score: float
     lost_frames: int
-    global_motion: GlobalMotion
+    global_motion: FrameStabilizerResult
     message: str = ""

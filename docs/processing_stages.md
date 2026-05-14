@@ -55,7 +55,7 @@
 
 ---
 
-## 4) moving_area_detection
+## 4) motion_localization
 
 **Что это:** поиск зон, где есть движение.
 
@@ -66,7 +66,7 @@
 
 ---
 
-## 5) target_candidate_extraction
+## 5) candidate_formation
 
 **Что это:** выделение кандидатов на цель.
 

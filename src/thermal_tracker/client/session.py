@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 from thermal_tracker.core.config import TrackerPreset, build_preset
 from thermal_tracker.core.connections.frames import OpenCvVideoSource
-from thermal_tracker.core.domain.models import DetectedObject, ProcessedFrame, TrackSnapshot
+from thermal_tracker.core.domain.models import ProcessedFrame, TrackSnapshot
+from thermal_tracker.core.stages.candidate_formation.result import DetectedObject
 from thermal_tracker.core.domain.runtime import SessionRuntimeState
 from thermal_tracker.core.scenarios import ScenarioFactory
 

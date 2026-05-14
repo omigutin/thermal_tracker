@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 from typing import ClassVar, Self
 
 from ....config import PresetFieldReader
-from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import ProcessedFrame
+from ...candidate_formation.result import DetectedObject
+from ...frame_stabilization.result import FrameStabilizerResult
 from ..type import CandidateFilterType
 from .base_candidate_filter import BaseCandidateFilter
 
@@ -49,11 +51,11 @@ class BorderTouchCandidateFilter(BaseCandidateFilter):
 
     config: BorderTouchCandidateFilterConfig = field(default_factory=BorderTouchCandidateFilterConfig, )
 
-    def filter(
+    def apply(
         self,
         frame: ProcessedFrame,
         objects: list[DetectedObject],
-        motion: GlobalMotion,
+        motion: FrameStabilizerResult,
     ) -> list[DetectedObject]:
         """Удалить объекты, расположенные слишком близко к границе кадра."""
 

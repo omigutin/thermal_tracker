@@ -1,9 +1,13 @@
-"""Публичный API стадии выбора цели."""
-
-from .target_selector_manager import TargetSelectorManager
-from .target_selector_type import TargetSelectorType
+from .config import TARGET_SELECTION_CONFIG_CLASSES, TargetSelectionConfig
+from .manager import TargetSelectionManager
+from .result import TargetPolarity, TargetSelectorResult
+from .type import TargetSelectorType
 
 __all__ = (
-    "TargetSelectorManager",
+    "TARGET_SELECTION_CONFIG_CLASSES",
+    "TargetPolarity",
+    "TargetSelectionConfig",
+    "TargetSelectionManager",
+    "TargetSelectorResult",
     "TargetSelectorType",
 )

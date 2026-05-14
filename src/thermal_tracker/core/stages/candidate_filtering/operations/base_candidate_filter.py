@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import ProcessedFrame
+from ...candidate_formation.result import DetectedObject
+from ...frame_stabilization.result import FrameStabilizerResult
 
 
 class BaseCandidateFilter(ABC):
@@ -19,10 +21,10 @@ class BaseCandidateFilter(ABC):
     """
 
     @abstractmethod
-    def filter(self,
-               frame: ProcessedFrame,
-               objects: list[DetectedObject],
-               motion: GlobalMotion,
-    ) -> list[DetectedObject]:
+    def apply(self,
+              frame: ProcessedFrame,
+              objects: list[DetectedObject],
+              motion: FrameStabilizerResult,
+              ) -> list[DetectedObject]:
         """ Отфильтровать список объектов-кандидатов. """
         raise NotImplementedError

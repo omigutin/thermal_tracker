@@ -67,7 +67,7 @@ class GlobalMotionConfig:
 class MovingAreaDetectionConfig:
     """Параметры детектора движущихся областей."""
 
-    method: str = "opencv_mog2"
+    method: str = "mog2"
 
 
 @dataclass
@@ -387,9 +387,9 @@ def _build_preset_record(path: Path) -> _PresetRecord:
         **_normalize_preprocessing_section(dict(data.get("preprocessing", {})))
     )
     global_motion = GlobalMotionConfig(**dict(data.get("global_motion", {})))
-    moving_area_detection = MovingAreaDetectionConfig(**dict(data.get("moving_area_detection", {})))
+    moving_area_detection = MovingAreaDetectionConfig(**dict(data.get("motion_localization", {})))
     target_candidate_extraction = TargetCandidateExtractionConfig(
-        **dict(data.get("target_candidate_extraction", {}))
+        **dict(data.get("candidate_formation", {}))
     )
     target_recovery = TargetRecoveryConfig(
         **_normalize_target_recovery_section(dict(data.get("target_recovery", {})))

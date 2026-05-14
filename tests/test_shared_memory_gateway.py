@@ -61,7 +61,7 @@ def test_gateway_runtime_synthetic_click_roundtrip() -> None:
             rng=rng,
         )
         gateway.publish_raw_y8(frame.tobytes(), frame_id=1, remote_timestamp_ns=123)
-        gateway.write_command({"type": "click", "x": 41, "y": 297})
+        gateway.write_command({"type": "contrast_component", "x": 41, "y": 297})
 
         app = RuntimeApp(
             config=load_app_config("tests/fixtures/server_smoke.toml"),

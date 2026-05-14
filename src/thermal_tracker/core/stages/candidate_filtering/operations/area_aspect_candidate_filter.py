@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 from typing import ClassVar, Self
 
 from ....config import PresetFieldReader
-from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import ProcessedFrame
+from ...candidate_formation.result import DetectedObject
+from ...frame_stabilization.result import FrameStabilizerResult
 from ..type import CandidateFilterType
 from .base_candidate_filter import BaseCandidateFilter
 
@@ -61,11 +63,11 @@ class AreaAspectCandidateFilter(BaseCandidateFilter):
 
     config: AreaAspectCandidateFilterConfig = field(default_factory=AreaAspectCandidateFilterConfig, )
 
-    def filter(self,
-        frame: ProcessedFrame,
-        objects: list[DetectedObject],
-        motion: GlobalMotion,
-    ) -> list[DetectedObject]:
+    def apply(self,
+              frame: ProcessedFrame,
+              objects: list[DetectedObject],
+              motion: FrameStabilizerResult,
+              ) -> list[DetectedObject]:
         """Удалить объекты с недопустимой площадью или пропорциями bbox."""
 
         _ = motion

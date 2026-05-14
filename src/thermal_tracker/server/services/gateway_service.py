@@ -437,15 +437,15 @@ def create_app(config: GatewayConfig | None = None):
             command["model_path"] = model_path
         return gateway.write_command(command)
 
-    @app.post("/api/commands/click")
+    @app.post("/api/commands/contrast_component")
     async def click(request: Request) -> dict[str, Any]:
         data = await request.json()
         try:
             x = int(data["x"])
             y = int(data["y"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise HTTPException(status_code=400, detail="Команда click требует x и y.") from exc
-        return gateway.write_command({"type": "click", "x": x, "y": y, "timestamp_ns": now_ns()})
+            raise HTTPException(status_code=400, detail="Команда contrast_component требует x и y.") from exc
+        return gateway.write_command({"type": "contrast_component", "x": x, "y": y, "timestamp_ns": now_ns()})
 
     @app.post("/api/commands/reset")
     def reset() -> dict[str, Any]:

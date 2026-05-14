@@ -13,13 +13,13 @@ import numpy as np
 
 from .models import (
     BoundingBox,
-    DetectedObject,
-    GlobalMotion,
-    MotionDetectionResult,
     ProcessedFrame,
-    SelectionResult,
     TrackSnapshot,
 )
+from ..stages.target_selection.result import TargetSelectorResult
+from ..stages.candidate_formation.result import DetectedObject
+from ..stages.frame_stabilization.result import FrameStabilizerResult
+from ..stages.motion_localization import MotionLocalizerResult
 
 
 class VideoSource(Protocol):
@@ -42,7 +42,7 @@ class FramePreprocessor(Protocol):
 class GlobalMotionEstimator(Protocol):
     """Оценивает движение камеры."""
 
-    def estimate(self, frame: ProcessedFrame) -> GlobalMotion:
+    def estimate(self, frame: ProcessedFrame) -> FrameStabilizerResult:
         """Возвращает глобальный сдвиг кадра."""
 
 
@@ -54,20 +54,20 @@ class ClickInitializer(Protocol):
         frame: ProcessedFrame,
         point: tuple[int, int],
         expected_bbox: BoundingBox | None = None,
-    ) -> SelectionResult:
+    ) -> TargetSelectorResult:
         """Находит объект вокруг точки."""
 
 
 class SingleTargetTracker(Protocol):
     """Ведёт одну выбранную цель."""
 
-    def snapshot(self, motion: GlobalMotion) -> TrackSnapshot:
+    def snapshot(self, motion: FrameStabilizerResult) -> TrackSnapshot:
         """Возвращает текущий снимок состояния."""
 
     def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
         """Запускает трек по клику."""
 
-    def update(self, frame: ProcessedFrame, motion: GlobalMotion) -> TrackSnapshot:
+    def update(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TrackSnapshot:
         """Обновляет трек на новом кадре."""
 
     def reset(self) -> TrackSnapshot:
@@ -77,14 +77,14 @@ class SingleTargetTracker(Protocol):
 class MotionDetector(Protocol):
     """Ищет движение на уже подготовленном кадре."""
 
-    def detect(self, frame: ProcessedFrame, motion: GlobalMotion) -> MotionDetectionResult:
+    def detect(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> MotionLocalizerResult:
         """Возвращает маску и служебную информацию по движению."""
 
 
 class ObjectBuilder(Protocol):
     """Собирает объекты из маски движения или другого детектора."""
 
-    def build(self, frame: ProcessedFrame, detection: MotionDetectionResult) -> list[DetectedObject]:
+    def build(self, frame: ProcessedFrame, detection: MotionLocalizerResult) -> list[DetectedObject]:
         """Преобразует результат детектора в список объектов."""
 
 
@@ -95,7 +95,7 @@ class FalseTargetFilter(Protocol):
         self,
         frame: ProcessedFrame,
         objects: list[DetectedObject],
-        motion: GlobalMotion,
+        motion: FrameStabilizerResult,
     ) -> list[DetectedObject]:
         """Возвращает только те объекты, которым доверяем."""
 
@@ -107,7 +107,7 @@ class Reacquirer(Protocol):
         self,
         frame: ProcessedFrame,
         last_bbox: BoundingBox,
-        motion: GlobalMotion,
+        motion: FrameStabilizerResult,
     ) -> BoundingBox | None:
         """Возвращает новый bbox или `None`, если цель не нашли."""
 

@@ -48,7 +48,7 @@ min_background_pixels = 10
 #----------------------------------------------------------------------------------------------------------------------#
 
 [moving_area_detection]
-method = "opencv_mog2"
+method = "mog2"
 
 [target_candidate_extraction]
 method = "opencv_connected_components"

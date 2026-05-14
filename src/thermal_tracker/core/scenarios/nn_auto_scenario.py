@@ -16,7 +16,9 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
-from ..domain.models import DetectedObject, GlobalMotion, ProcessedFrame, TrackSnapshot, TrackerState
+from ..domain.models import ProcessedFrame, TrackSnapshot, TrackerState
+from ..stages.candidate_formation.result import DetectedObject
+from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..nnet_interface import YoloNnetInterface
 from ..stages.frame_preprocessing import FramePreprocessorManager
@@ -36,7 +38,7 @@ class AutoNeuralDetectionPipeline:
         self.engine = YoloNnetInterface(self.preset.neural)
 
         self.current_frame: ProcessedFrame | None = None
-        self.current_snapshot: TrackSnapshot = self._build_snapshot(GlobalMotion(), (), "Нейросеть ещё не запускалась.")
+        self.current_snapshot: TrackSnapshot = self._build_snapshot(FrameStabilizerResult(), (), "Нейросеть ещё не запускалась.")
         self._candidate_objects: tuple[DetectedObject, ...] = ()
 
     @property
@@ -59,7 +61,7 @@ class AutoNeuralDetectionPipeline:
         """Прогоняет новый кадр через полностью автоматический NN-контур."""
 
         self.current_frame = self.preprocessor.process(raw_frame)
-        motion = self.motion_estimator.estimate(self.current_frame)
+        motion = self.motion_estimator.apply(self.current_frame)
         self._candidate_objects = tuple(self.engine.track(self.current_frame.bgr))
         self.current_snapshot = self._build_snapshot(
             motion,
@@ -76,7 +78,7 @@ class AutoNeuralDetectionPipeline:
         self._consume_runtime_actions(runtime, motion)
         return self.current_snapshot
 
-    def _consume_runtime_actions(self, runtime: SessionRuntimeState, motion: GlobalMotion) -> None:
+    def _consume_runtime_actions(self, runtime: SessionRuntimeState, motion: FrameStabilizerResult) -> None:
         """Съедает клик и reset без побочных приключений."""
 
         if runtime.reset_requested:
@@ -97,7 +99,7 @@ class AutoNeuralDetectionPipeline:
 
     def _build_snapshot(
         self,
-        motion: GlobalMotion,
+        motion: FrameStabilizerResult,
         detections: tuple[DetectedObject, ...],
         message: str,
     ) -> TrackSnapshot:

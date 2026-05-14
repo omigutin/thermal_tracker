@@ -17,11 +17,13 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
-from ..domain.models import DetectedObject, GlobalMotion, MotionDetectionResult, ProcessedFrame
+from ..domain.models import ProcessedFrame
+from ..stages.candidate_formation.result import DetectedObject
+from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import AutoScenarioStepResult, SessionRuntimeState
 from ..stages.candidate_filtering import CandidateFilterManager
-from ..stages.moving_area_detection import MovingAreaDetectorManager
-from ..stages.target_candidate_extraction import TargetCandidateExtractorManager
+from ..stages.motion_localization import MovingAreaDetectorManager, MotionLocalizerResult
+from ..stages.candidate_formation import TargetCandidateExtractorManager
 from ..stages.frame_preprocessing import FramePreprocessorManager
 from ..stages.frame_stabilization import FrameStabilizerManager
 
@@ -38,8 +40,8 @@ class AutoMotionTrackingPipeline:
         self.false_target_filter = CandidateFilterManager(self.preset.candidate_filtering.enabled_operations)
 
         self.current_frame: ProcessedFrame | None = None
-        self.current_motion: GlobalMotion = GlobalMotion()
-        self.current_detection: MotionDetectionResult = MotionDetectionResult(
+        self.current_motion: FrameStabilizerResult = FrameStabilizerResult()
+        self.current_detection: MotionLocalizerResult = MotionLocalizerResult(
             mask=np.zeros((1, 1), dtype=np.uint8),
             source_name="empty",
         )
@@ -65,7 +67,7 @@ class AutoMotionTrackingPipeline:
         """
 
         self.current_frame = self.preprocessor.process(raw_frame)
-        self.current_motion = self.motion_estimator.estimate(self.current_frame)
+        self.current_motion = self.motion_estimator.apply(self.current_frame)
         self.current_detection = self.motion_detector.detect(self.current_frame, self.current_motion)
         self.current_raw_objects = self.object_builder.build(self.current_frame, self.current_detection)
         self.current_filtered_objects = self.false_target_filter.apply(

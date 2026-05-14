@@ -6,7 +6,9 @@ from typing import ClassVar, Self
 import numpy as np
 
 from ....config import PresetFieldReader
-from ....domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ....domain.models import ProcessedFrame
+from ...candidate_formation.result import DetectedObject
+from ...frame_stabilization.result import FrameStabilizerResult
 from ..type import CandidateFilterType
 from .base_candidate_filter import BaseCandidateFilter
 
@@ -61,11 +63,11 @@ class ContrastCandidateFilter(BaseCandidateFilter):
 
     config: ContrastCandidateFilterConfig = field(default_factory=ContrastCandidateFilterConfig, )
 
-    def filter(
+    def apply(
         self,
         frame: ProcessedFrame,
         objects: list[DetectedObject],
-        motion: GlobalMotion,
+        motion: FrameStabilizerResult,
     ) -> list[DetectedObject]:
         """Удалить объекты с недостаточным контрастом относительно фона."""
 

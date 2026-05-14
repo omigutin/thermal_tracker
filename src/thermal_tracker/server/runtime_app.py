@@ -11,7 +11,8 @@ from thermal_tracker.core.connections.frames import create_frame_reader
 from thermal_tracker.core.connections.results import create_result_writer
 from thermal_tracker.core.connections.shared_memory import SharedMemoryFrame
 from thermal_tracker.core.connections.shared_memory.protocol import now_ns
-from thermal_tracker.core.domain.models import BoundingBox, GlobalMotion, TrackSnapshot
+from thermal_tracker.core.domain.models import BoundingBox, TrackSnapshot
+from thermal_tracker.core.stages.frame_stabilization.result import FrameStabilizerResult
 from thermal_tracker.core.domain.runtime import ScenarioStepResult, SessionRuntimeState
 from thermal_tracker.core.diagnostic_writer import create_diagnostic_builder
 from thermal_tracker.core.scenarios import default_preset_for_scenario
@@ -111,7 +112,7 @@ class RuntimeApp:
             return
 
         command_type = str(command.get("type") or command.get("command") or "").strip().lower()
-        if command_type == "click":
+        if command_type == "contrast_component":
             try:
                 x = int(command["x"])
                 y = int(command["y"])
@@ -230,7 +231,7 @@ def _bbox_to_dict(bbox: BoundingBox | None) -> dict[str, int] | None:
     }
 
 
-def _motion_to_dict(motion: GlobalMotion) -> dict[str, object]:
+def _motion_to_dict(motion: FrameStabilizerResult) -> dict[str, object]:
     """Преобразует оценку движения камеры в JSON-совместимый словарь."""
 
     return {

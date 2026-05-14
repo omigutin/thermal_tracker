@@ -11,7 +11,8 @@ import cv2
 import numpy as np
 
 from thermal_tracker.core.config import VisualizationConfig
-from thermal_tracker.core.domain.models import BoundingBox, DetectedObject, ProcessedFrame, TrackSnapshot, TrackerState
+from thermal_tracker.core.domain.models import BoundingBox, ProcessedFrame, TrackSnapshot, TrackerState
+from thermal_tracker.core.stages.candidate_formation.result import DetectedObject
 
 
 def _draw_box(

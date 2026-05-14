@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import DetectedObject, GlobalMotion, MotionDetectionResult, ProcessedFrame, TrackSnapshot
+from .models import ProcessedFrame, TrackSnapshot
+from ..stages.candidate_formation.result import DetectedObject
+from ..stages.frame_stabilization.result import FrameStabilizerResult
+from ..stages.motion_localization import MotionLocalizerResult
 
 
 @dataclass
@@ -30,7 +33,7 @@ class AutoScenarioStepResult:
     """Результат автоматического сценария после обработки одного кадра."""
 
     frame: ProcessedFrame
-    global_motion: GlobalMotion
-    motion_result: MotionDetectionResult
+    global_motion: FrameStabilizerResult
+    motion_result: MotionLocalizerResult
     raw_objects: list[DetectedObject]
     filtered_objects: list[DetectedObject]

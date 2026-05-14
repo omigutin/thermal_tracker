@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..domain.models import DetectedObject
+from ..stages.candidate_formation.result import DetectedObject
 
 
 class BaseNnetInterface(ABC):

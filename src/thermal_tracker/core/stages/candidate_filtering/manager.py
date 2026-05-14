@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ...domain.models import DetectedObject, GlobalMotion, ProcessedFrame
+from ...domain.models import ProcessedFrame
+from ..candidate_formation.result import DetectedObject
+from ..frame_stabilization.result import FrameStabilizerResult
 from .config import CandidateFilterConfig
 from .factory import CandidateFilterFactory
 from .operations.base_candidate_filter import BaseCandidateFilter
@@ -27,7 +29,7 @@ class CandidateFilterManager:
         """Вернуть подготовленные runtime-фильтры в порядке применения."""
         return self._operations
 
-    def apply(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: GlobalMotion) -> list[DetectedObject]:
+    def apply(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: FrameStabilizerResult) -> list[DetectedObject]:
         """Последовательно применить runtime-фильтры к списку кандидатов."""
 
         current = list(objects)

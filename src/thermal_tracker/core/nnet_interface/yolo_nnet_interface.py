@@ -15,7 +15,8 @@ import numpy as np
 from ultralytics import YOLO
 
 from ..config import NeuralConfig, PROJECT_ROOT
-from ..domain.models import BoundingBox, DetectedObject
+from ..domain.models import BoundingBox
+from ..stages.candidate_formation.result import DetectedObject
 from .base_nnet_interface import BaseNnetInterface
 
 

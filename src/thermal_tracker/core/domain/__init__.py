@@ -20,33 +20,30 @@ from .contracts import (
 )
 from .models import (
     BoundingBox,
-    DetectedObject,
-    GlobalMotion,
-    MotionDetectionResult,
+    MotionLocalizationResult,
     ProcessedFrame,
-    SelectionResult,
     TrackSnapshot,
     TrackerState,
 )
+from ..stages.target_selection.result import TargetSelectorResult
+from ..stages.candidate_formation.result import DetectedObject
+from ..stages.frame_stabilization.result import FrameStabilizerResult
 from .runtime import AutoScenarioStepResult, ScenarioStepResult, SessionRuntimeState
 
 __all__ = [
     "AutoScenarioStepResult",
     "BoundingBox",
     "ClickInitializer",
-    "DetectedObject",
     "FalseTargetFilter",
     "FramePreprocessor",
     "FrameRenderer",
-    "GlobalMotion",
     "GlobalMotionEstimator",
-    "MotionDetectionResult",
+    "MotionLocalizerResult",
     "MotionDetector",
     "ObjectBuilder",
     "ScenarioStepResult",
     "ProcessedFrame",
     "Reacquirer",
-    "SelectionResult",
     "SessionRuntimeState",
     "SingleTargetTracker",
     "TrackSnapshot",
