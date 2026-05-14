@@ -23,7 +23,63 @@ description = """
 [pipeline]
 kind = "manual_click_classical"
 
-#----------------------------------------- Отбраковка плохих кандидатов -----------------------------------------------#
+[frame_preprocessing]
+enabled = true
+
+[[frame_preprocessing.operations]]
+type = "resize"
+enabled = true
+target_width = 960
+
+[[frame_preprocessing.operations]]
+type = "gaussian_blur"
+enabled = true
+kernel = 3
+
+[[frame_preprocessing.operations]]
+type = "median_blur"
+enabled = true
+kernel = 3
+
+[[frame_preprocessing.operations]]
+type = "minmax_normalize"
+enabled = true
+
+[[frame_preprocessing.operations]]
+type = "clahe_contrast"
+enabled = true
+clip_limit = 2.0
+tile_grid_size = 8
+
+[[frame_preprocessing.operations]]
+type = "sharpness_metric"
+enabled = true
+
+[frame_stabilization]
+enabled = true
+
+[[frame_stabilization.operations]]
+type = "phase_correlation"
+enabled = true
+downscale = 0.5
+blur_kernel = 7
+min_response = 0.025
+max_shift_ratio = 0.4
+
+[motion_localization]
+enabled = true
+
+[[motion_localization.operations]]
+type = "mog2"
+enabled = true
+
+[candidate_formation]
+enabled = true
+
+[[candidate_formation.operations]]
+type = "connected_components"
+enabled = true
+
 [candidate_filtering]
 enabled = true
 
@@ -45,70 +101,13 @@ enabled = true
 min_contrast = 5.0
 border = 6
 min_background_pixels = 10
-#----------------------------------------------------------------------------------------------------------------------#
 
-[moving_area_detection]
-method = "mog2"
-
-[target_candidate_extraction]
-method = "opencv_connected_components"
-
-[target_recovery]
-# Используем IRST-recoverer — тот же локальный контраст, но с расширяющейся зоной.
-method = "irst_contrast"
-# Запускаем recovery достаточно быстро: IRST-трекер сам управляет max_lost_frames.
-min_lost_frames = 3
-# Базовый радиус зоны recovery; IRST-recoverer берёт search_padding и search_padding_growth.
-search_padding = 40
-# Медленное расширение — при скорости ~2px/кадр объект уходит ~60px за 30 кадров.
-search_padding_growth = 5
-# Для совместимости контракта TargetRecoveryConfig (LocalTemplateReacquirer их не использует).
-scales = [1.0]
-match_threshold = 0.0
-template_alpha = 0.0
-# IRST-recovery устойчивее шаблонного — 3 кадра подряд достаточно.
-confirm_frames = 3
-recovery_window_frames = 45
-# Физический gate recoverer-а: отклоняем blob-ы дальше max_speed * lost_frames * 1.5.
-# Должно совпадать с [irst_tracking].max_speed_px_per_frame.
-# Предотвращает уход трека на облака и посторонние горячие объекты при RECOVERING.
-max_speed_px_per_frame = 6.0
-
-[preprocessing]
-# Сохраняем sharpness_metric — IRST-трекер читает frame.sharpness для детекции замутнения.
-methods = [
-    "resize",
-    "gaussian_blur",
-    "median_blur",
-    "minmax_normalize",
-    "clahe_contrast",
-    "sharpness_metric",
-]
-# Стандартная ширина — IRST работает на уменьшенном кадре стабильно.
-resize_width = 960
-# Лёгкое сглаживание: убирает соль/перец, не уничтожает контраст маленькой цели.
-gaussian_kernel = 3
-# Медианный фильтр против одиночных горячих пикселей, создающих ложные blob-ы.
-median_kernel = 3
-# Умеренное усиление контраста: помогает детектору на слабоконтрастной цели.
-clahe_clip_limit = 2.0
-clahe_tile_grid_size = 8
-
-[global_motion]
-method = "opencv_phase_correlation"
+[target_selection]
 enabled = true
-downscale = 0.5
-blur_kernel = 7
-# Сдвиг остаётся валидным при умеренной надёжности.
-min_response = 0.025
-max_shift_ratio = 0.4
 
-# click_selection используется TargetTrackerManager при создании трекера,
-# но IrstSingleTargetTracker делает собственный поиск blob по клику через
-# click_search_radius / click_fallback_size из [irst_tracking].
-# Значения ниже — разумные дефолты для интерфейса.
-[click_selection]
-method = "opencv_click"
+[[target_selection.operations]]
+type = "contrast_component"
+enabled = true
 search_radius = 60
 similarity_sigma = 1.5
 local_window_radius = 5
@@ -129,54 +128,47 @@ min_object_contrast = 5.0
 max_expanded_fill = 0.35
 max_expansion_ratio = 3.0
 
-[irst_tracking]
-# --- Детектор локального контраста ---
-# Размер внутреннего окна (объект): 3×3 — достаточно для blob в 1–10px.
-filter_kernel = 3
-# Размер окна фона: должен быть достаточно большим, чтобы охватить весь объект + кольцо фона.
-background_kernel = 11
-# Порог контраста (0–255): 12 хорошо отсекает тепловой шум и сохраняет малый объект.
-# Если ложных срабатываний много — повышайте; если цель теряется — снижайте.
-contrast_threshold = 12.0
-# Минимальная площадь blob: 1px — принимаем даже точечный объект.
-min_blob_area = 1
-# Максимальная площадь blob: 200px² — не захватываем крупные облачные структуры.
-max_blob_area = 200
+[target_tracking]
+enabled = true
 
-# --- Фильтр Калмана (модель постоянной скорости: cx, cy, vx, vy) ---
-# Шум позиции: небольшой — объект движется плавно, не скачет.
-kalman_process_noise_pos = 0.5
-# Шум скорости: умеренный — допускаем небольшое ускорение (манёвр).
-kalman_process_noise_vel = 2.0
-# Шум измерения: 1.5px — центроид blob определяется достаточно точно.
-kalman_measurement_noise = 1.5
-
-# --- Зона захвата (gate) ---
-# Начальный радиус gate: 20px — маленький объект не прыгает далеко за 1 кадр.
-min_gate = 20
-# Расширение при потере: +3px за кадр — за 10 кадров зона вырастает до 50px.
-gate_growth = 3
-# Жёсткий потолок: ограничиваем зону 100px, чтобы не захватить постороннее.
-max_gate = 100
-# Физический предел скорости: 6px/кадр (~95й перцентиль по данным тестов).
-# Объект за этим порогом физически не мог переместиться так быстро.
-max_speed_px_per_frame = 6.0
-
-# --- Устойчивость к потере ---
-# Ждём 30 кадров без обнаружения прежде чем объявить цель потерянной.
-max_lost_frames = 30
-
-# --- Обработка замутнения ---
-blur_hold_enabled = true
-# При падении резкости ниже 60% от baseline — считаем кадр замутнённым.
-blur_sharpness_drop_ratio = 0.60
-
-# --- Выбор цели кликом ---
-# Радиус поиска blob вокруг точки клика. Достаточно широкий, чтобы захватить
-# небольшое промахивание оператора.
+[[target_tracking.operations]]
+type = "irst_contrast"
+enabled = true
 click_search_radius = 50
-# Размер fallback-бокса, если рядом с кликом нет контрастного blob.
 click_fallback_size = 10
+filter_kernel = 3
+background_kernel = 11
+contrast_threshold = 12.0
+min_blob_area = 1
+max_blob_area = 200
+min_gate = 20
+max_gate = 100
+gate_growth = 3
+max_speed_px_per_frame = 6.0
+max_lost_frames = 30
+kalman_process_noise_pos = 0.5
+kalman_process_noise_vel = 2.0
+kalman_measurement_noise = 1.5
+blur_hold_enabled = true
+blur_sharpness_drop_ratio = 0.6
+
+[target_recovery]
+enabled = true
+min_lost_frames = 3
+confirm_frames = 3
+recovery_window_frames = 45
+
+[[target_recovery.operations]]
+type = "irst_contrast"
+enabled = true
+search_padding = 40
+search_padding_growth = 5
+max_speed_px_per_frame = 6.0
+contrast_threshold = 12.0
+min_blob_area = 1
+max_blob_area = 200
+filter_kernel = 3
+background_kernel = 11
 
 [visualization]
 show_search_region = true

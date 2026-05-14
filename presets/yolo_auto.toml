@@ -1,12 +1,11 @@
-# Автоматический нейросетевой режим, где модель сама ищет все цели на каждом кадре.
-# Этот пресет нужен, когда хотим быстро проверить, что YOLO видит без ручного клика.
+# Migrated preset for stage-operation configuration format.
+# Generated from legacy preset sections: preprocessing/global_motion/click_selection/etc.
 
 [meta]
 id = "yolo_auto"
 title = "YOLO Auto"
 tooltip = "Автоматический режим: нейросеть сама ищет все объекты."
-description = """
-Подходит для сценария, где не нужно кликать по цели.
+description = """Подходит для сценария, где не нужно кликать по цели.
 Модель сама прогоняет каждый кадр и показывает все найденные объекты.
 Хорош как быстрый просмотр возможностей датасета и модели без ручного single-target режима.
 """
@@ -14,31 +13,53 @@ description = """
 [pipeline]
 kind = "auto_neural_detection"
 
-[preprocessing]
-# Минимальная цепочка для neural-режима без CLAHE и blur.
-methods = [
-    "resize",
-    "minmax_normalize",
-    "gradient",
-    "sharpness_metric",
-]
-resize_width = 960
-gaussian_kernel = 1
-median_kernel = 1
-clahe_clip_limit = 2.0
-clahe_tile_grid_size = 8
-gradient_blur_kernel = 1
+[frame_preprocessing]
+enabled = true
 
-[global_motion]
-method = "opencv_phase_correlation"
+[[frame_preprocessing.operations]]
+type = "resize"
+enabled = true
+target_width = 960
+
+[[frame_preprocessing.operations]]
+type = "minmax_normalize"
+enabled = true
+
+[[frame_preprocessing.operations]]
+type = "gradient"
+enabled = true
+blur_kernel = 1
+
+[[frame_preprocessing.operations]]
+type = "sharpness_metric"
+enabled = true
+
+[frame_stabilization]
+enabled = true
+
+[[frame_stabilization.operations]]
+type = "phase_correlation"
 enabled = true
 downscale = 0.5
 blur_kernel = 9
 min_response = 0.03
 max_shift_ratio = 0.35
 
-[click_selection]
-method = "opencv_click"
+[motion_localization]
+enabled = false
+
+[candidate_formation]
+enabled = false
+
+[candidate_filtering]
+enabled = false
+
+[target_selection]
+enabled = true
+
+[[target_selection.operations]]
+type = "contrast_component"
+enabled = true
 search_radius = 100
 similarity_sigma = 1.35
 local_window_radius = 5
@@ -59,23 +80,35 @@ min_object_contrast = 6.0
 max_expanded_fill = 0.58
 max_expansion_ratio = 5.5
 
-[yolo_tracking]
+[target_tracking]
+enabled = true
+
+[[target_tracking.operations]]
+type = "yolo"
+enabled = true
+max_lost_frames = 90
 search_margin = 30
 lost_search_growth = 26
-max_lost_frames = 90
-[visualization]
-show_search_region = false
-show_predicted_box = false
-show_global_motion = true
-line_thickness = 2
+max_reacquire_distance_factor = 2.6
+prefer_same_class = true
+click_search_radius = 100
+
+[target_recovery]
+enabled = false
 
 [neural]
 engine_name = "ultralytics_yolo"
 model_path = "models/drone_detect_v26n_100_28042026.pt"
 tracker_config_path = "trackers/bytetrack.yaml"
-confidence_threshold = 0.20
+confidence_threshold = 0.2
 iou_threshold = 0.45
 allowed_classes = []
 device = ""
 max_reacquire_distance_factor = 2.6
 prefer_same_class = true
+
+[visualization]
+show_search_region = false
+show_predicted_box = false
+show_global_motion = true
+line_thickness = 2

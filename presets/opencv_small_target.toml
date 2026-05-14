@@ -1,24 +1,79 @@
-# Пресет для маленькой цели.
-# Нужен там, где объект занимает мало пикселей и легко теряется на фоне.
+# Migrated preset for stage-operation configuration format.
+# Generated from legacy preset sections: preprocessing/global_motion/click_selection/etc.
 
 [meta]
-# Техническое имя пресета, по которому он выбирается в коде и в CLI.
 id = "opencv_small_target"
-# Короткое название для GUI.
 title = "OpenCV Small Target"
-# Очень короткая подсказка для hover и компактных мест интерфейса.
 tooltip = "Для маленьких и относительно изолированных целей."
-# Человеческое описание, когда именно этот пресет стоит брать.
-description = """
-Лучше работает на компактных объектах, которые занимают мало пикселей.
+description = """Лучше работает на компактных объектах, которые занимают мало пикселей.
 Держит более компактный поиск и аккуратнее относится к размеру рамки.
 """
 
 [pipeline]
-# Явно говорим, какой сценарий должен быть собран для этого пресета.
 kind = "manual_click_classical"
 
-#----------------------------------------- Отбраковка плохих кандидатов -----------------------------------------------#
+[frame_preprocessing]
+enabled = true
+
+[[frame_preprocessing.operations]]
+type = "resize"
+enabled = true
+target_width = 960
+
+[[frame_preprocessing.operations]]
+type = "gaussian_blur"
+enabled = true
+kernel = 3
+
+[[frame_preprocessing.operations]]
+type = "median_blur"
+enabled = true
+kernel = 3
+
+[[frame_preprocessing.operations]]
+type = "minmax_normalize"
+enabled = true
+
+[[frame_preprocessing.operations]]
+type = "clahe_contrast"
+enabled = true
+clip_limit = 2.4
+tile_grid_size = 8
+
+[[frame_preprocessing.operations]]
+type = "gradient"
+enabled = true
+blur_kernel = 3
+
+[[frame_preprocessing.operations]]
+type = "sharpness_metric"
+enabled = true
+
+[frame_stabilization]
+enabled = true
+
+[[frame_stabilization.operations]]
+type = "phase_correlation"
+enabled = true
+downscale = 0.5
+blur_kernel = 7
+min_response = 0.025
+max_shift_ratio = 0.4
+
+[motion_localization]
+enabled = true
+
+[[motion_localization.operations]]
+type = "mog2"
+enabled = true
+
+[candidate_formation]
+enabled = true
+
+[[candidate_formation.operations]]
+type = "connected_components"
+enabled = true
+
 [candidate_filtering]
 enabled = true
 
@@ -40,193 +95,89 @@ enabled = true
 min_contrast = 5.0
 border = 6
 min_background_pixels = 10
-#----------------------------------------------------------------------------------------------------------------------#
 
-[moving_area_detection]
-method = "mog2"
-
-[target_candidate_extraction]
-method = "opencv_connected_components"
-
-[target_recovery]
-# Какой recoverer выбирает TargetRecovererManager (см. TargetRecovererType).
-method = "local_template"
-# Запускаем recoverer раньше — пока объект ещё рядом с последней известной позицией.
-min_lost_frames = 3
-# Базовый радиус поиска небольшой — маленькую цель легко спутать с соседом.
-search_padding = 30
-# Медленное расширение зоны: при v~2px/кадр объект за 30 кадров уходит ~60px.
-# Прежнее значение 14 раздувало зону до 460px уже к 30-му кадру, что провоцировало
-# ложные срабатывания на облаках и контрастных краях.
-search_padding_growth = 4
-# Диапазон масштабов с мелким шагом: маленький объект может немного менять
-# видимый размер из-за нестабильности сегментации.
-scales = [0.85, 0.93, 1.0, 1.08, 1.15]
-# Строгий порог совпадения: при стабильном шаблоне (template_alpha=0.08)
-# можно требовать высокую уверенность, чтобы отсечь ложные срабатывания.
-match_threshold = 0.62
-# Адаптивный шаблон обновляем медленно, чтобы не учиться на размытом контуре.
-template_alpha = 0.08
-# Требуем 5 последовательных кандидатов в согласованной позиции.
-# Случайные прыжки облаков не дают 5 подряд в одной зоне — это предотвращает
-# ошибочный промоут bbox-скачков, которые наблюдались в телеметрии (до 114px/кадр).
-confirm_frames = 5
-# Более длинное окно компенсирует медленный рост зоны поиска и строгий confirm.
-recovery_window_frames = 50
-
-[preprocessing]
-# Последовательность атомарных операций предобработки кадра.
-methods = [
-    "resize",
-    "gaussian_blur",
-    "median_blur",
-    "minmax_normalize",
-    "clahe_contrast",
-    "gradient",
-    "sharpness_metric",
-]
-# Если кадр слишком широкий, уменьшаем его до этой ширины перед обработкой.
-resize_width = 960
-# Размер гауссова размытия для мягкого подавления обычного шума.
-gaussian_kernel = 3
-# Размер медианного фильтра против одиночных пиксельных всплесков.
-median_kernel = 3
-# Насколько агрессивно CLAHE усиливает локальный контраст.
-clahe_clip_limit = 2.4
-# На сколько плиток делим кадр для работы CLAHE.
-clahe_tile_grid_size = 8
-# Отдельное сглаживание перед расчётом карты градиентов.
-gradient_blur_kernel = 3
-
-[global_motion]
-method = "opencv_phase_correlation"
-# Включать ли оценку общего движения камеры.
+[target_selection]
 enabled = true
-# Во сколько раз уменьшать кадр перед phase correlation.
-downscale = 0.5
-# Размер сглаживания перед оценкой глобального сдвига.
-blur_kernel = 7
-# Минимальная надёжность ответа, ниже которой сдвиг считаем сомнительным.
-min_response = 0.025
-# Максимальный допустимый сдвиг как доля размера кадра.
-max_shift_ratio = 0.4
 
-[click_selection]
-method = "opencv_click"
-# Радиус первичного поиска объекта вокруг точки клика.
+[[target_selection.operations]]
+type = "contrast_component"
+enabled = true
 search_radius = 60
-# Насколько широко разрешаем разброс яркости вокруг пикселя клика.
 similarity_sigma = 1.6
-# Радиус локального окна для оценки местной статистики.
 local_window_radius = 4
-# Нижняя граница допуска по яркости при сегментации.
 min_tolerance = 8
-# Верхняя граница допуска по яркости при сегментации.
 max_tolerance = 55
-# Минимальная площадь компоненты, которую считаем объектом.
 min_component_area = 10
-# Максимальная доля патча, которую может занять одна компонента без подозрений.
 max_component_fill = 0.35
-# Насколько компоненте можно расползтись по ширине или высоте патча.
 max_patch_span_ratio = 0.8
-# Во сколько раз уточнение может расширить уже найденный bbox.
 max_refine_growth = 1.35
-# Во сколько раз увеличиваем радиус, если первая попытка выбора не удалась.
 retry_scale = 1.5
-# Предельный радиус повторной попытки выбора цели.
 max_retry_radius = 120
-# Сколько пикселей добавляем вокруг найденного объекта.
 padding = 3
-# Размер запасного бокса, если сегментация совсем не удалась.
 fallback_size = 12
-# Запас вокруг ядра при попытке расширить его до целого объекта.
 expansion_margin = 14
-# Толщина внешнего кольца фона для оценки контраста.
 background_ring = 8
-# Доля контраста, по которой строим порог объекта относительно фона.
 foreground_fraction = 0.55
-# Минимальный контраст объекта к фону для уверенного расширения.
 min_object_contrast = 5.0
-# Максимальная доля рабочей области, которую может занять расширенный объект.
 max_expanded_fill = 0.28
-# Во сколько раз расширенный объект может быть больше исходного ядра.
 max_expansion_ratio = 2.2
 
-[opencv_tracking]
-# Запас вокруг предсказанной позиции при обычном поиске.
-search_margin = 18
-# На сколько расширяем область поиска, когда цель начала теряться.
-lost_search_growth = 12
-# Намеренно большое значение: явный full-frame switch отключён.
-# Для маленькой цели full-frame поиск опасен ложными срабатываниями; expanding margin
-# (search_margin + lost_frames * lost_search_growth) постепенно расширяется до нужного
-# размера, не создавая резкого скачка.
-full_frame_after = 999
-# Сколько кадров подряд можно терпеть потерю цели.
-# Синхронизировано с blur_hold_max_frames: нет смысла ждать дольше конца blur-окна.
-max_lost_frames = 30
-# Какие масштабы бокса перебираем при сопоставлении шаблона.
-scales = [0.72, 0.84, 0.94, 1.0, 1.08, 1.18]
-# Минимальный порог совпадения для обычного сопровождения.
-track_threshold = 0.43
-# Минимальный порог совпадения для повторного захвата.
-reacquire_threshold = 0.52
-# Порог уверенности, после которого разрешаем обновить шаблон цели.
-template_update_threshold = 0.6
-# Скорость обновления адаптивного шаблона цели.
-template_alpha = 0.1
-# Насколько сильно учитываем новую оценку скорости цели.
-velocity_alpha = 0.35
-# Самый маленький допустимый размер бокса.
+[target_tracking]
+enabled = true
+
+[[target_tracking.operations]]
+type = "template_point"
+enabled = true
 min_box_size = 8
-# Штраф за кандидатов, которые слишком далеко от предсказанного центра.
-distance_penalty = 0.12
-# Максимально допустимый рост бокса за один обычный шаг.
-max_size_growth = 1.18
-# Максимально допустимое сжатие бокса за один обычный шаг.
-max_size_shrink = 0.65
-# Насколько можно увеличить бокс при повторном захвате.
-max_size_growth_on_reacquire = 1.35
-# Жёсткий потолок от стартового размера: маленькая цель не должна превращаться в кусок облака.
-max_size_growth_from_initial = 1.5
-# Насколько можно уменьшить бокс при повторном захвате.
-max_size_shrink_on_reacquire = 0.5
-# Верхняя граница числа опорных точек для LK-трекинга.
-max_feature_points = 28
-# Нижняя граница числа опорных точек, ниже которой пора переинициализироваться.
-min_feature_points = 4
-# Порог качества углов при поиске опорных точек.
-feature_quality_level = 0.015
-# Минимальная дистанция между опорными точками.
-feature_min_distance = 4
-# Как часто полностью обновлять набор опорных точек.
-feature_refresh_interval = 5
-# Дополнительный запас вокруг бокса для поиска новых точек.
+search_margin = 18
 point_search_margin = 10
-# Максимальный сдвиг центра в обычном режиме как доля размера объекта.
+lost_search_growth = 12
+full_frame_after = 999
+max_lost_frames = 30
+track_threshold = 0.43
+reacquire_threshold = 0.52
+template_update_threshold = 0.6
+scales = [0.72, 0.84, 0.94, 1.0, 1.08, 1.18]
+distance_penalty = 0.12
+template_alpha = 0.1
+velocity_alpha = 0.35
 max_tracking_center_shift = 1.65
-# Максимальный сдвиг центра при повторном захвате.
 max_reacquire_center_shift = 2.9
-# Как быстро расширяем допуск по центру, если потеря затягивается.
 reacquire_center_growth = 0.34
-edge_exit_margin = 10
+max_size_shrink = 0.65
+max_size_growth = 1.18
+max_size_shrink_on_reacquire = 0.5
+max_size_growth_on_reacquire = 1.35
+max_size_growth_from_initial = 1.5
 edge_exit_max_lost_frames = 4
-# При длительном замутнении не сбрасываем цель сразу, а держим прогноз движения.
+edge_exit_margin = 10
+max_feature_points = 28
+min_feature_points = 4
+feature_quality_level = 0.015
+feature_min_distance = 4
+feature_refresh_interval = 5
 blur_hold_enabled = true
-# Чуть строже порог «плохого кадра» — blur_hold не активируется на умеренных замутнениях.
-blur_sharpness_drop_ratio = 0.60
-# При v~2px/кадр за 30 кадров объект уходит ~60px — приемлемый дрейф для локального поиска.
-# Прежнее значение 70 создавало 140px дрейфа, что требовало огромной зоны восстановления.
+blur_sharpness_drop_ratio = 0.6
 blur_hold_max_frames = 30
-# Меньший допуск по центру: при коротком blur-окне цель уходит умеренно.
 blur_hold_center_growth = 0.05
 
+[target_recovery]
+enabled = true
+min_lost_frames = 3
+confirm_frames = 5
+recovery_window_frames = 50
+
+[[target_recovery.operations]]
+type = "local_template"
+enabled = true
+search_padding = 30
+search_padding_growth = 4
+scales = [0.85, 0.93, 1.0, 1.08, 1.15]
+match_threshold = 0.62
+template_alpha = 0.08
+
 [visualization]
-# Показывать ли на кадре область текущего поиска.
 show_search_region = true
-# Показывать ли предсказанный бокс до подтверждения совпадения.
 show_predicted_box = true
-# Показывать ли служебную информацию о движении камеры.
 show_global_motion = true
-# Толщина линий при рисовании боксов и служебных рамок.
 line_thickness = 1

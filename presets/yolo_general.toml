@@ -1,55 +1,65 @@
-# Нейросетевой режим на базе YOLO + внешнего tracker-конфига.
-# Этот пресет нужен для первых практических тестов, когда хотим проверить,
-# как готовая модель справляется с детекцией и сопровождением сама.
+# Migrated preset for stage-operation configuration format.
+# Generated from legacy preset sections: preprocessing/global_motion/click_selection/etc.
 
 [meta]
-# Техническое имя пресета для GUI, CLI и кода.
 id = "yolo_general"
-# Короткое имя для списка пресетов.
 title = "YOLO General"
-# Короткая подсказка для hover и компактных мест интерфейса.
 tooltip = "Нейросетевой режим: YOLO + ByteTrack."
-# Нормальное человеческое описание того, когда стоит брать этот режим.
-description = """
-Использует готовую YOLO-модель и внешний tracker-конфиг для сопровождения целей.
+description = """Использует готовую YOLO-модель и внешний tracker-конфиг для сопровождения целей.
 Хорош как быстрый neural baseline, когда хочется проверить, справится ли модель
 сама без основного classical single-target контура.
 """
 
 [pipeline]
-# Какой pipeline нужно собрать для этого пресета.
 kind = "manual_click_neural"
 
-[preprocessing]
-# Минимальная цепочка для neural-режима: масштабируем, нормализуем и считаем градиент.
-# Тяжёлый шумоподав и CLAHE не нужны — модель работает с менее обработанной картинкой.
-methods = [
-    "resize",
-    "minmax_normalize",
-    "gradient",
-    "sharpness_metric",
-]
-# Для neural-режима это в основном ограничение размера кадра, чтобы не душить железо.
-resize_width = 960
-# Размеры ядер для blur оставлены минимальными на случай, если в пресет добавят blur-операции.
-gaussian_kernel = 1
-median_kernel = 1
-clahe_clip_limit = 2.0
-clahe_tile_grid_size = 8
-gradient_blur_kernel = 1
+[frame_preprocessing]
+enabled = true
 
-[global_motion]
-method = "opencv_phase_correlation"
-# Пока оставляем оценку движения камеры включённой для статуса и будущего reacquire.
+[[frame_preprocessing.operations]]
+type = "resize"
+enabled = true
+target_width = 960
+
+[[frame_preprocessing.operations]]
+type = "minmax_normalize"
+enabled = true
+
+[[frame_preprocessing.operations]]
+type = "gradient"
+enabled = true
+blur_kernel = 1
+
+[[frame_preprocessing.operations]]
+type = "sharpness_metric"
+enabled = true
+
+[frame_stabilization]
+enabled = true
+
+[[frame_stabilization.operations]]
+type = "phase_correlation"
 enabled = true
 downscale = 0.5
 blur_kernel = 9
 min_response = 0.03
 max_shift_ratio = 0.35
 
-[click_selection]
-method = "opencv_click"
-# Если клик не попал прямо в bbox, пробуем ближайшую детекцию в этом радиусе.
+[motion_localization]
+enabled = false
+
+[candidate_formation]
+enabled = false
+
+[candidate_filtering]
+enabled = false
+
+[target_selection]
+enabled = true
+
+[[target_selection.operations]]
+type = "contrast_component"
+enabled = true
 search_radius = 100
 similarity_sigma = 1.35
 local_window_radius = 5
@@ -70,32 +80,35 @@ min_object_contrast = 6.0
 max_expanded_fill = 0.58
 max_expansion_ratio = 5.5
 
-[yolo_tracking]
+[target_tracking]
+enabled = true
+
+[[target_tracking.operations]]
+type = "yolo"
+enabled = true
+max_lost_frames = 90
 search_margin = 30
 lost_search_growth = 26
-max_lost_frames = 90
+max_reacquire_distance_factor = 2.6
+prefer_same_class = true
+click_search_radius = 100
+
+[target_recovery]
+enabled = false
+
+[neural]
+engine_name = "ultralytics_yolo"
+model_path = "models/drone_detect_v26n_100_28042026.pt"
+tracker_config_path = "trackers/bytetrack.yaml"
+confidence_threshold = 0.2
+iou_threshold = 0.45
+allowed_classes = []
+device = ""
+max_reacquire_distance_factor = 2.6
+prefer_same_class = true
+
 [visualization]
 show_search_region = true
 show_predicted_box = true
 show_global_motion = true
 line_thickness = 2
-
-[neural]
-# Какой backend инференса использовать.
-engine_name = "ultralytics_yolo"
-# Путь к весам модели относительно корня проекта.
-model_path = "models/drone_detect_v26n_100_28042026.pt"
-# Путь к конфигу внешнего multi-object tracker.
-tracker_config_path = "trackers/bytetrack.yaml"
-# Минимальная уверенность нейросетевой детекции.
-confidence_threshold = 0.20
-# Порог IoU для внутренней фильтрации модели.
-iou_threshold = 0.45
-# Пустой список означает: брать все классы, которые вернёт модель.
-allowed_classes = []
-# Пусто значит: пусть backend сам выберет устройство.
-device = ""
-# Насколько далеко от прошлого положения можно искать цель при смене track id.
-max_reacquire_distance_factor = 2.6
-# Стараться ли держаться того же класса при повторном захвате.
-prefer_same_class = true
