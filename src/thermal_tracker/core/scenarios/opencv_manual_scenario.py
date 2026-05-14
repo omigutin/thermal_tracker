@@ -14,7 +14,8 @@ import numpy as np
 
 from ..config import TrackerPreset, build_preset
 from ..stages.target_tracking.type import TargetTrackerType
-from ..domain.models import BoundingBox, ProcessedFrame, TrackSnapshot, TrackerState
+from ..domain.models import BoundingBox, ProcessedFrame, TrackerState
+from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.candidate_formation.result import DetectedObject
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
@@ -60,7 +61,7 @@ class ManualClickTrackingPipeline:
         )
 
         self.current_frame: ProcessedFrame | None = None
-        self.current_snapshot: TrackSnapshot = self.tracker.snapshot(FrameStabilizerResult())
+        self.current_snapshot: TargetTrackingResult = self.tracker.snapshot(FrameStabilizerResult())
 
         # Pipeline-уровневая state machine. Не имеет таблицы переходов:
         # бизнес-правила переходов живут в коде ниже, machine хранит current.
@@ -101,7 +102,7 @@ class ManualClickTrackingPipeline:
         self.current_snapshot = self._process_runtime_actions(runtime)
         return ScenarioStepResult(frame=self.current_frame, snapshot=self.current_snapshot)
 
-    def apply_static_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def apply_static_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         """Обрабатывает клик или сброс, когда видео стоит на паузе."""
 
         if self.current_frame is None:
@@ -109,7 +110,7 @@ class ManualClickTrackingPipeline:
         self.current_snapshot = self._process_static_actions(runtime)
         return self.current_snapshot
 
-    def _process_runtime_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def _process_runtime_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         """Разбирает клик, сброс и обычное обновление на новом кадре."""
 
         assert self.current_frame is not None
@@ -128,7 +129,7 @@ class ManualClickTrackingPipeline:
         motion = self.motion_estimator.apply(self.current_frame)
         return self._step_with_motion(self.current_frame, motion)
 
-    def _process_static_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def _process_static_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         """Обрабатывает действия пользователя без продвижения видео вперёд."""
 
         assert self.current_frame is not None
@@ -145,7 +146,7 @@ class ManualClickTrackingPipeline:
 
         return snapshot
 
-    def _on_reset(self) -> TrackSnapshot:
+    def _on_reset(self) -> TargetTrackingResult:
         """Полный сброс: трекер, recoverer, pending-recovery, state machine."""
 
         snapshot = self.tracker.reset()
@@ -156,7 +157,7 @@ class ManualClickTrackingPipeline:
         self._state_machine.reset(TrackerState.IDLE)
         return snapshot
 
-    def _on_click(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
+    def _on_click(self, frame: ProcessedFrame, point: tuple[int, int]) -> TargetTrackingResult:
         """Старт нового трека по клику пользователя."""
 
         snapshot = self.tracker.start_tracking(frame, point)
@@ -169,7 +170,7 @@ class ManualClickTrackingPipeline:
         )
         return self._after_tracker_step(snapshot)
 
-    def _step_with_motion(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def _step_with_motion(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Один шаг pipeline: трекер обновляется, pipeline решает state."""
 
         if self._state_machine.current == TrackerState.RECOVERING:
@@ -178,7 +179,7 @@ class ManualClickTrackingPipeline:
         snapshot = self.tracker.update(frame, motion)
         return self._handle_tracker_snapshot(snapshot, motion)
 
-    def _handle_tracker_snapshot(self, snapshot: TrackSnapshot, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def _handle_tracker_snapshot(self, snapshot: TargetTrackingResult, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Принимает snapshot трекера и решает pipeline-уровневый переход."""
 
         if snapshot.state == TrackerState.TRACKING:
@@ -200,7 +201,7 @@ class ManualClickTrackingPipeline:
             self._last_good_bbox = None
         return snapshot
 
-    def _maybe_start_recovery(self, snapshot: TrackSnapshot, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def _maybe_start_recovery(self, snapshot: TargetTrackingResult, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Из SEARCHING пытается стартовать pending recovery."""
 
         if snapshot.lost_frames < self.preset.target_recovery.min_lost_frames:
@@ -220,7 +221,7 @@ class ManualClickTrackingPipeline:
         self._state_machine.transition_to(TrackerState.RECOVERING)
         return self._make_recovering_snapshot(candidate, snapshot.lost_frames, motion)
 
-    def _handle_recovering(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def _handle_recovering(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Каждый кадр в RECOVERING: пытается подтвердить или перейти в LOST."""
 
         assert self._pending_bbox is not None
@@ -253,7 +254,7 @@ class ManualClickTrackingPipeline:
         frame: ProcessedFrame,
         bbox: BoundingBox,
         motion: FrameStabilizerResult,
-    ) -> TrackSnapshot:
+    ) -> TargetTrackingResult:
         """Подтверждённый recovery: возобновляем трек с тем же track_id."""
 
         track_id = self._tracking_track_id if self._tracking_track_id is not None else 0
@@ -263,11 +264,11 @@ class ManualClickTrackingPipeline:
         self._state_machine.transition_to(TrackerState.TRACKING)
         return self._after_tracker_step(snapshot)
 
-    def _fall_to_lost(self, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def _fall_to_lost(self, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Окно RECOVERING исчерпано — переходим в LOST и сбрасываем трекер."""
 
         self.tracker.reset()
-        lost_snapshot = TrackSnapshot(
+        lost_snapshot = TargetTrackingResult(
             state=TrackerState.LOST,
             track_id=self._tracking_track_id,
             bbox=None,
@@ -289,10 +290,10 @@ class ManualClickTrackingPipeline:
         bbox: BoundingBox,
         lost_frames: int,
         motion: FrameStabilizerResult,
-    ) -> TrackSnapshot:
+    ) -> TargetTrackingResult:
         """Снимок, который видит GUI/JSONL, пока идёт track-before-confirm."""
 
-        return TrackSnapshot(
+        return TargetTrackingResult(
             state=TrackerState.RECOVERING,
             track_id=self._tracking_track_id,
             bbox=bbox,
@@ -337,7 +338,7 @@ class ManualClickTrackingPipeline:
         self._pending_confirmations = 0
         self._pending_age_frames = 0
 
-    def _after_tracker_step(self, snapshot: TrackSnapshot) -> TrackSnapshot:
+    def _after_tracker_step(self, snapshot: TargetTrackingResult) -> TargetTrackingResult:
         """Освежает память recoverer-а на каждом подтверждённом TRACKING-кадре."""
 
         if (

@@ -1,44 +1,38 @@
-"""Базовый класс для single-target трекеров."""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from thermal_tracker.core.domain.models import BoundingBox, ProcessedFrame, TrackSnapshot
-from thermal_tracker.core.stages.frame_stabilization.result import FrameStabilizerResult
+from ....domain.models import BoundingBox, ProcessedFrame
+from ..result import TargetTrackingResult
+from ...frame_stabilization import FrameStabilizerResult
 
 
-class BaseSingleTargetTracker(ABC):
-    """Любой трекер одной цели должен уметь стартовать, обновляться и сбрасываться."""
-
-    @abstractmethod
-    def snapshot(self, motion: FrameStabilizerResult) -> TrackSnapshot:
-        """Возвращает текущее состояние трекера."""
+class BaseTargetTracker(ABC):
+    """Базовый интерфейс трекера одной цели."""
 
     @abstractmethod
-    def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
-        """Запускает сопровождение по одному клику."""
+    def snapshot(self, motion: FrameStabilizerResult) -> TargetTrackingResult:
+        """Вернуть текущее состояние трекера."""
+        raise NotImplementedError
 
     @abstractmethod
-    def update(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TrackSnapshot:
-        """Обновляет состояние на следующем кадре."""
+    def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TargetTrackingResult:
+        """Начать сопровождение цели по точке выбора."""
+        raise NotImplementedError
 
     @abstractmethod
-    def reset(self) -> TrackSnapshot:
-        """Сбрасывает текущее состояние трекера."""
+    def update(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TargetTrackingResult:
+        """Обновить состояние трекера по новому кадру."""
+        raise NotImplementedError
 
-    def resume_tracking(
-        self,
-        frame: ProcessedFrame,
-        bbox: BoundingBox,
-        track_id: int,
-    ) -> TrackSnapshot:
-        """Возобновляет сопровождение цели с конкретным track_id и bbox.
+    @abstractmethod
+    def reset(self) -> TargetTrackingResult:
+        """Сбросить текущее состояние трекера."""
+        raise NotImplementedError
 
-        Используется pipeline-ом после подтверждённого recovery, чтобы
-        продолжить трек с тем же ID и не плодить новые. По умолчанию
-        метод не реализован: конкретный трекер должен переопределить
-        его, если участвует в сценариях с recovery.
+    def resume_tracking(self, frame: ProcessedFrame, bbox: BoundingBox, track_id: int) -> TargetTrackingResult:
         """
-
-        raise NotImplementedError("resume_tracking is not implemented for this tracker.")
+            Возобновить сопровождение цели с заданными bbox и track_id.
+            Используется после восстановления цели, чтобы продолжить старый трек, а не создавать новый идентификатор.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not support target tracking resume.")

@@ -1,9 +1,15 @@
-"""Публичный API стадии повторного захвата цели."""
-
-from .manager import TargetRecovererManager
+from .config import (
+    TARGET_RECOVERER_CONFIG_CLASSES,
+    TargetRecovererConfig,
+)
+from .manager import TargetRecoveryManager
+from .result import TargetRecoveryResult
 from .type import TargetRecovererType
 
 __all__ = (
-    "TargetRecovererManager",
+    "TARGET_RECOVERER_CONFIG_CLASSES",
+    "TargetRecovererConfig",
     "TargetRecovererType",
+    "TargetRecoveryManager",
+    "TargetRecoveryResult",
 )

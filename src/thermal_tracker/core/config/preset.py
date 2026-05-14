@@ -168,7 +168,7 @@ class OpenCVTrackerConfig:
 
 @dataclass
 class YoloTrackerConfig:
-    """Параметры NN single-target трекера (nn_yolo).
+    """Параметры NN single-target трекера (yolo).
 
     Содержит только поля, которые реально читает YoloTrackSingleTargetTracker.
     Секция TOML: [yolo_tracking].

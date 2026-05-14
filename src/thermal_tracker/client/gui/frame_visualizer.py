@@ -11,7 +11,8 @@ import cv2
 import numpy as np
 
 from thermal_tracker.core.config import VisualizationConfig
-from thermal_tracker.core.domain.models import BoundingBox, ProcessedFrame, TrackSnapshot, TrackerState
+from thermal_tracker.core.domain.models import BoundingBox, ProcessedFrame, TrackerState
+from thermal_tracker.core.stages.target_tracking.result import TargetTrackingResult
 from thermal_tracker.core.stages.candidate_formation.result import DetectedObject
 
 
@@ -65,7 +66,7 @@ def _build_candidate_label(detection: DetectedObject) -> str:
 
 
 def build_status_lines(
-    snapshot: TrackSnapshot,
+    snapshot: TargetTrackingResult,
     preset_name: str,
     *,
     paused: bool = False,
@@ -104,7 +105,7 @@ def build_status_lines(
 
 
 def build_status_text(
-    snapshot: TrackSnapshot,
+    snapshot: TargetTrackingResult,
     preset_name: str,
     *,
     paused: bool = False,
@@ -117,7 +118,7 @@ def build_status_text(
 
 def render_frame(
     frame: ProcessedFrame,
-    snapshot: TrackSnapshot,
+    snapshot: TargetTrackingResult,
     visualization: VisualizationConfig,
     preset_name: str,
     pending_click: tuple[int, int] | None = None,
@@ -162,7 +163,7 @@ def render_frame(
     return canvas
 
 
-def _draw_status_bar(image: np.ndarray, snapshot: TrackSnapshot, preset_name: str) -> None:
+def _draw_status_bar(image: np.ndarray, snapshot: TargetTrackingResult, preset_name: str) -> None:
     """Рисует старую OpenCV-панель состояния поверх кадра."""
 
     lines = build_status_lines(snapshot, preset_name)

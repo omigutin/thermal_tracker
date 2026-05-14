@@ -7,8 +7,6 @@ from enum import Enum
 
 import numpy as np
 
-from ..stages.frame_stabilization import FrameStabilizerResult
-
 
 class TrackerState(str, Enum):
     """Состояния жизненного цикла одной отслеживаемой цели.
@@ -119,18 +117,3 @@ class ProcessedFrame:
     normalized: np.ndarray
     gradient: np.ndarray
     quality: FrameQuality | None = None
-
-
-@dataclass
-class TrackSnapshot:
-    """Снимок текущего состояния трекера для GUI и логики."""
-
-    state: TrackerState
-    track_id: int | None
-    bbox: BoundingBox | None
-    predicted_bbox: BoundingBox | None
-    search_region: BoundingBox | None
-    score: float
-    lost_frames: int
-    global_motion: FrameStabilizerResult
-    message: str = ""

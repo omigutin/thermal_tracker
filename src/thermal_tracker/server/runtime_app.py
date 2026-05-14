@@ -11,7 +11,8 @@ from thermal_tracker.core.connections.frames import create_frame_reader
 from thermal_tracker.core.connections.results import create_result_writer
 from thermal_tracker.core.connections.shared_memory import SharedMemoryFrame
 from thermal_tracker.core.connections.shared_memory.protocol import now_ns
-from thermal_tracker.core.domain.models import BoundingBox, TrackSnapshot
+from thermal_tracker.core.domain.models import BoundingBox
+from thermal_tracker.core.stages.target_tracking.result import TargetTrackingResult
 from thermal_tracker.core.stages.frame_stabilization.result import FrameStabilizerResult
 from thermal_tracker.core.domain.runtime import ScenarioStepResult, SessionRuntimeState
 from thermal_tracker.core.diagnostic_writer import create_diagnostic_builder
@@ -242,7 +243,7 @@ def _motion_to_dict(motion: FrameStabilizerResult) -> dict[str, object]:
     }
 
 
-def _snapshot_to_dict(snapshot: TrackSnapshot) -> dict[str, object]:
+def _snapshot_to_dict(snapshot: TargetTrackingResult) -> dict[str, object]:
     """Преобразует снимок трекера в компактный JSON."""
 
     return {

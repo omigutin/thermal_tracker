@@ -16,7 +16,8 @@ from __future__ import annotations
 import numpy as np
 
 from ..config import TrackerPreset, build_preset
-from ..domain.models import ProcessedFrame, TrackSnapshot, TrackerState
+from ..domain.models import ProcessedFrame, TrackerState
+from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.candidate_formation.result import DetectedObject
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
@@ -38,7 +39,7 @@ class AutoNeuralDetectionPipeline:
         self.engine = YoloNnetInterface(self.preset.neural)
 
         self.current_frame: ProcessedFrame | None = None
-        self.current_snapshot: TrackSnapshot = self._build_snapshot(FrameStabilizerResult(), (), "Нейросеть ещё не запускалась.")
+        self.current_snapshot: TargetTrackingResult = self._build_snapshot(FrameStabilizerResult(), (), "Нейросеть ещё не запускалась.")
         self._candidate_objects: tuple[DetectedObject, ...] = ()
 
     @property
@@ -71,7 +72,7 @@ class AutoNeuralDetectionPipeline:
         self._consume_runtime_actions(runtime, motion)
         return ScenarioStepResult(frame=self.current_frame, snapshot=self.current_snapshot)
 
-    def apply_static_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def apply_static_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         """В авто-режиме клик не нужен, но честно объясняем это пользователю."""
 
         motion = self.current_snapshot.global_motion
@@ -102,11 +103,11 @@ class AutoNeuralDetectionPipeline:
         motion: FrameStabilizerResult,
         detections: tuple[DetectedObject, ...],
         message: str,
-    ) -> TrackSnapshot:
+    ) -> TargetTrackingResult:
         """Собирает компактный снимок состояния для GUI."""
 
         score = max((detection.confidence for detection in detections), default=0.0)
-        return TrackSnapshot(
+        return TargetTrackingResult(
             state=TrackerState.IDLE,
             track_id=None,
             bbox=None,

@@ -12,7 +12,8 @@ import numpy as np
 
 from ..config import TrackerPreset, build_preset
 from ..stages.target_tracking.type import TargetTrackerType
-from ..domain.models import ProcessedFrame, TrackSnapshot
+from ..domain.models import ProcessedFrame
+from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.candidate_formation.result import DetectedObject
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
@@ -37,14 +38,14 @@ class ManualClickNeuralPipeline:
         self.preprocessor = FramePreprocessorManager(self.preset.preprocessing.methods, self.preset.preprocessing)
         self.motion_estimator = FrameStabilizerManager(self.preset.global_motion.method, self.preset.global_motion)
         self.tracker = TargetTrackerManager(
-            TargetTrackerType.NN_YOLO,
+            TargetTrackerType.YOLO,
             self.preset.yolo_tracker,
             self.preset.click_selection,
             self.preset.neural,
         )
 
         self.current_frame: ProcessedFrame | None = None
-        self.current_snapshot: TrackSnapshot = self.tracker.snapshot(FrameStabilizerResult())
+        self.current_snapshot: TargetTrackingResult = self.tracker.snapshot(FrameStabilizerResult())
 
     @property
     def preset_name(self) -> str:
@@ -65,13 +66,13 @@ class ManualClickNeuralPipeline:
         self.current_snapshot = self._process_runtime_actions(runtime)
         return ScenarioStepResult(frame=self.current_frame, snapshot=self.current_snapshot)
 
-    def apply_static_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def apply_static_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         if self.current_frame is None:
             return self.current_snapshot
         self.current_snapshot = self._process_static_actions(runtime)
         return self.current_snapshot
 
-    def _process_runtime_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def _process_runtime_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         assert self.current_frame is not None
 
         if runtime.reset_requested:
@@ -89,7 +90,7 @@ class ManualClickNeuralPipeline:
 
         return snapshot
 
-    def _process_static_actions(self, runtime: SessionRuntimeState) -> TrackSnapshot:
+    def _process_static_actions(self, runtime: SessionRuntimeState) -> TargetTrackingResult:
         assert self.current_frame is not None
         snapshot = self.current_snapshot
 

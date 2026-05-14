@@ -22,9 +22,9 @@ from .models import (
     BoundingBox,
     MotionLocalizationResult,
     ProcessedFrame,
-    TrackSnapshot,
     TrackerState,
 )
+from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.target_selection.result import TargetSelectorResult
 from ..stages.candidate_formation.result import DetectedObject
 from ..stages.frame_stabilization.result import FrameStabilizerResult
@@ -46,7 +46,6 @@ __all__ = [
     "Reacquirer",
     "SessionRuntimeState",
     "SingleTargetTracker",
-    "TrackSnapshot",
     "TrackerState",
     "VideoSource",
 ]

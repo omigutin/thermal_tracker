@@ -14,8 +14,8 @@ import numpy as np
 from .models import (
     BoundingBox,
     ProcessedFrame,
-    TrackSnapshot,
 )
+from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.target_selection.result import TargetSelectorResult
 from ..stages.candidate_formation.result import DetectedObject
 from ..stages.frame_stabilization.result import FrameStabilizerResult
@@ -61,16 +61,16 @@ class ClickInitializer(Protocol):
 class SingleTargetTracker(Protocol):
     """Ведёт одну выбранную цель."""
 
-    def snapshot(self, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def snapshot(self, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Возвращает текущий снимок состояния."""
 
-    def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TrackSnapshot:
+    def start_tracking(self, frame: ProcessedFrame, point: tuple[int, int]) -> TargetTrackingResult:
         """Запускает трек по клику."""
 
-    def update(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TrackSnapshot:
+    def update(self, frame: ProcessedFrame, motion: FrameStabilizerResult) -> TargetTrackingResult:
         """Обновляет трек на новом кадре."""
 
-    def reset(self) -> TrackSnapshot:
+    def reset(self) -> TargetTrackingResult:
         """Сбрасывает текущую цель."""
 
 
@@ -118,7 +118,7 @@ class FrameRenderer(Protocol):
     def __call__(
         self,
         frame: ProcessedFrame,
-        snapshot: TrackSnapshot,
+        snapshot: TargetTrackingResult,
         *args,
         **kwargs,
     ) -> np.ndarray:

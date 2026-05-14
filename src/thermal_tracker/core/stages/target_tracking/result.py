@@ -1,16 +1,21 @@
-"""Результат поиска цели на текущем кадре."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...domain.models import BoundingBox
+from ...domain.models import BoundingBox, TrackerState
+from ..frame_stabilization import FrameStabilizerResult
 
 
-@dataclass
-class SearchResult:
-    """Лучший найденный кандидат на текущем кадре."""
+@dataclass(slots=True)
+class TargetTrackingResult:
+    """Результат стадии сопровождения выбранной цели."""
 
-    bbox: BoundingBox
+    state: TrackerState
+    track_id: int | None
+    bbox: BoundingBox | None
+    predicted_bbox: BoundingBox | None
+    search_region: BoundingBox | None
     score: float
-    search_region: BoundingBox
+    lost_frames: int
+    global_motion: FrameStabilizerResult
+    message: str = ""

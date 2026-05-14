@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import ProcessedFrame, TrackSnapshot
+from .models import ProcessedFrame
+from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.candidate_formation.result import DetectedObject
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..stages.motion_localization import MotionLocalizerResult
@@ -25,7 +26,7 @@ class ScenarioStepResult:
     """Результат интерактивного сценария после обработки одного кадра."""
 
     frame: ProcessedFrame
-    snapshot: TrackSnapshot
+    snapshot: TargetTrackingResult
 
 
 @dataclass
