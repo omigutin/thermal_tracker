@@ -9,7 +9,7 @@ Thermal Tracker — это проект для сопровождения объ
 1. Прочитайте [Быстрый старт](docs/quick_start.md).
 2. Посмотрите [Режимы запуска](docs/run_modes.md).
 3. Для настройки качества перейдите в [Пресеты](docs/presets.md).
-4. Чтобы понять внутреннюю логику, откройте [Стадии обработки](docs/processing_stages.md).
+4. Чтобы понять внутреннюю логику, откройте [Стадии обработки](docs/stages.md).
 
 ## Основные документы
 
@@ -17,7 +17,7 @@ Thermal Tracker — это проект для сопровождения объ
 - [Режимы запуска](docs/run_modes.md)
 - [Конфигурация](docs/configuration.md)
 - [Пресеты](docs/presets.md)
-- [Стадии обработки](docs/processing_stages.md)
+- [Стадии обработки](docs/stages.md)
 - [Сценарии](docs/scenarios.md)
 - [IRST-трекинг](docs/irst_tracking.md)
 - [Архитектура](docs/architecture.md)

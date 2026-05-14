@@ -19,7 +19,7 @@ class ResizeFramePreprocessorConfig(BaseFramePreprocessorConfig):
     # Тип операции для связи конфигурации с фабрикой.
     operation_type: ClassVar[FramePreprocessorType] = FramePreprocessorType.RESIZE
     # Целевая ширина кадра; None означает отсутствие масштабирования.
-    target_width: int | None = None
+    target_width: int | None = 960
 
     def __post_init__(self) -> None:
         """Проверить корректность параметров масштабирования."""

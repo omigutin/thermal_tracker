@@ -29,21 +29,21 @@ class YoloTargetTrackerConfig:
     # Включает или отключает операцию.
     enabled: bool = True
     # Тип операции для связи конфигурации с фабрикой.
-    operation_type: ClassVar[TargetTrackerType] = TargetTrackerType.YOLO_TRACK
+    operation_type: ClassVar[TargetTrackerType] = TargetTrackerType.YOLO
 
     # Конфигурация нейросетевого YOLO-интерфейса.
     neural_config: NeuralConfig | None = None
 
     # Радиус поиска ближайшей детекции при стартовом клике.
-    click_search_radius: int = 32
+    click_search_radius: int = 80
     # Максимальное количество кадров потери перед сбросом трека.
-    max_lost_frames: int = 15
+    max_lost_frames: int = 90
     # Базовый отступ search-region вокруг последнего bbox.
-    search_margin: int = 24
+    search_margin: int = 30
     # Рост search-region за каждый потерянный кадр.
-    lost_search_growth: int = 8
+    lost_search_growth: int = 26
     # Множитель максимальной дистанции для повторного захвата цели.
-    max_reacquire_distance_factor: float = 2.5
+    max_reacquire_distance_factor: float = 2.6
     # Требовать совпадение класса при повторном захвате, если класс известен.
     prefer_same_class: bool = True
 

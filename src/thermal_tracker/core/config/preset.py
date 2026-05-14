@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 import tomllib
 
-from ..stages.candidate_filtering import CANDIDATE_FILTER_CONFIG_CLASSES, CandidateFilterConfig
 from .stage_config import StageConfig
 from .stage_config_parser import StageConfigParser
+
+if TYPE_CHECKING:
+    from ..stages.candidate_filtering import CandidateFilterConfig
+    from ..stages.candidate_formation import CandidateFormerConfig
+    from ..stages.frame_preprocessing import FramePreprocessorConfig
+    from ..stages.frame_stabilization import FrameStabilizerConfig
+    from ..stages.motion_localization import MotionLocalizationConfig
+    from ..stages.target_recovery import TargetRecovererConfig
+    from ..stages.target_selection import TargetSelectionConfig
+    from ..stages.target_tracking import TargetTrackerConfig
+
 
 # Имя базового пресета, к которому откатываемся при сомнительном выборе.
 DEFAULT_PRESET_NAME = "opencv_general"
@@ -20,226 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 PRESETS_DIR = PROJECT_ROOT / "presets"
 
 
-@dataclass
-class PreprocessingConfig:
-    """Параметры стадии preprocessing.
-
-    `methods` задаёт последовательность атомарных операций. Параметры ниже
-    шарятся между операциями: каждая операция при сборке менеджером забирает
-    из этого dataclass только нужные ей поля.
-    """
-
-    methods: tuple[str, ...] = (
-        "resize",
-        "gaussian_blur",
-        "median_blur",
-        "minmax_normalize",
-        "clahe_contrast",
-        "gradient",
-        "sharpness_metric",
-    )
-    resize_width: int | None = 960  # Целевая ширина для операции `resize`.
-    gaussian_kernel: int = 5  # Размер ядра для `gaussian_blur`.
-    median_kernel: int = 3  # Размер ядра для `median_blur`.
-    clahe_clip_limit: float = 2.0  # Параметр clipLimit для `clahe_contrast`.
-    clahe_tile_grid_size: int = 8  # Размер сетки тайлов для `clahe_contrast`.
-    gradient_blur_kernel: int = 3  # Сглаживание перед Sobel в `gradient`.
-    bilateral_diameter: int = 7  # Диаметр окрестности для `bilateral`.
-    bilateral_sigma_color: float = 40.0  # sigmaColor для `bilateral`.
-    bilateral_sigma_space: float = 40.0  # sigmaSpace для `bilateral`.
-    percentile_low: float = 2.0  # Нижний перцентиль для `percentile_normalize`.
-    percentile_high: float = 98.0  # Верхний перцентиль для `percentile_normalize`.
-
-
-@dataclass
-class GlobalMotionConfig:
-    """Параметры грубой оценки движения камеры."""
-
-    enabled: bool = True
-    method: str = "opencv_phase_correlation"
-    downscale: float = 0.5
-    blur_kernel: int = 9
-    min_response: float = 0.03
-    max_shift_ratio: float = 0.35
-
-
-@dataclass
-class MovingAreaDetectionConfig:
-    """Параметры детектора движущихся областей."""
-
-    method: str = "mog2"
-
-
-@dataclass
-class TargetCandidateExtractionConfig:
-    """Параметры сборки кандидатов на цель."""
-
-    method: str = "opencv_connected_components"
-
-
-@dataclass
-class TargetRecoveryConfig:
-    """Параметры стадии повторного захвата цели."""
-
-    method: str = "local_template"  # Какой recoverer выбрать через TargetRecovererManager.
-    min_lost_frames: int = 5  # После скольких подряд потерянных кадров pipeline дёргает recoverer.
-    search_padding: int = 60  # Базовый радиус расширения last_bbox в зону поиска recovery.
-    search_padding_growth: int = 8  # Прирост радиуса поиска за каждый дополнительный потерянный кадр.
-    scales: tuple[float, ...] = (0.84, 0.94, 1.0, 1.08, 1.18)  # Масштабы шаблона при поиске.
-    match_threshold: float = 0.5  # Минимальный score (TM_CCOEFF_NORMED), при котором считаем кандидата найденным.
-    template_alpha: float = 0.12  # Скорость обновления адаптивного шаблона при remember().
-    confirm_frames: int = 3  # Сколько подряд согласованных кадров нужно для перехода RECOVERING -> TRACKING.
-    recovery_window_frames: int = 30  # Максимальная длина окна RECOVERING; после него pipeline уходит в LOST.
-    max_speed_px_per_frame: float = 0.0  # Физический предел скорости объекта при recovery (px/кадр).
-    # Значение 0.0 = gate отключён (backward-compatible для opencv-пресетов).
-    # Для IRST-пресетов задаётся явно через [target_recovery] в TOML.
-
-
-@dataclass
-class ClickSelectionConfig:
-    """Параметры начального выделения цели по одному клику."""
-
-    method: str = "opencv_click"
-    search_radius: int = 80
-    similarity_sigma: float = 1.35
-    local_window_radius: int = 5
-    min_tolerance: int = 10
-    max_tolerance: int = 42
-    min_component_area: int = 30
-    max_component_fill: float = 0.45
-    max_patch_span_ratio: float = 0.85
-    max_refine_growth: float = 1.8
-    retry_scale: float = 1.6
-    max_retry_radius: int = 180
-    padding: int = 8
-    fallback_size: int = 36
-    expansion_margin: int = 18
-    background_ring: int = 10
-    foreground_fraction: float = 0.36
-    min_object_contrast: float = 6.0
-    max_expanded_fill: float = 0.58
-    max_expansion_ratio: float = 5.5
-
-
-@dataclass
-class OpenCVTrackerConfig:
-    """Параметры classical single-target трекера (opencv_template_point).
-
-    Все поля используются исключительно ClickToTrackSingleTargetTracker.
-    Секция TOML: [opencv_tracking].
-    """
-
-    search_margin: int = 24
-    lost_search_growth: int = 18
-    # Намеренно большое значение: явный full-frame switch отключён.
-    # Expanding margin (search_margin + lost_frames * lost_search_growth) покрывает весь кадр
-    # органически до истечения max_lost_frames, не создавая резкого скачка зоны поиска.
-    full_frame_after: int = 999
-    max_lost_frames: int = 70
-    scales: tuple[float, ...] = (0.72, 0.84, 0.94, 1.0, 1.08, 1.18, 1.32)
-    track_threshold: float = 0.42
-    reacquire_threshold: float = 0.5
-    template_update_threshold: float = 0.62
-    template_alpha: float = 0.12
-    velocity_alpha: float = 0.45
-    min_box_size: int = 8
-    distance_penalty: float = 0.14
-    max_size_growth: float = 1.25
-    max_size_shrink: float = 0.72
-    max_size_growth_on_reacquire: float = 1.6
-    max_size_shrink_on_reacquire: float = 0.55
-    max_size_growth_from_initial: float = 4.0
-    max_feature_points: int = 40
-    min_feature_points: int = 6
-    feature_quality_level: float = 0.02
-    feature_min_distance: int = 6
-    feature_refresh_interval: int = 6
-    point_search_margin: int = 14
-    max_tracking_center_shift: float = 1.6
-    max_reacquire_center_shift: float = 2.8
-    reacquire_center_growth: float = 0.32
-    edge_exit_margin: int = 10
-    edge_exit_max_lost_frames: int = 4
-    blur_hold_enabled: bool = True
-    blur_sharpness_drop_ratio: float = 0.5
-    blur_hold_max_frames: int = 120
-    blur_hold_center_growth: float = 0.06
-
-
-@dataclass
-class YoloTrackerConfig:
-    """Параметры NN single-target трекера (yolo).
-
-    Содержит только поля, которые реально читает YoloTrackSingleTargetTracker.
-    Секция TOML: [yolo_tracking].
-    """
-
-    max_lost_frames: int = 90
-    search_margin: int = 30
-    lost_search_growth: int = 26
-
-
-@dataclass(frozen=True)
-class IrstTrackerConfig:
-    """Параметры IRST-трекера (irst_contrast) на базе локального контраста и фильтра Калмана.
-
-    IRST — Infrared Search and Track / инфракрасный поиск и сопровождение.
-    Вместо сопоставления шаблонов ищет пиксельный кластер, который значительно
-    ярче или темнее своего локального фона. Позиция измеряется центроидом кластера.
-    Движение предсказывается фильтром Калмана с моделью постоянной скорости.
-
-    Секция TOML: [irst_tracking].
-    """
-
-    # --- Детектор локального контраста ---
-    filter_kernel: int = 3
-    """Размер внутреннего окна для поиска локального максимума/минимума (пиксели)."""
-    background_kernel: int = 11
-    """Размер внешнего окна для оценки локального фона (пиксели, нечётное число)."""
-    contrast_threshold: float = 12.0
-    """Минимальный контраст (в единицах 0–255), при котором пиксель считается частью цели."""
-    min_blob_area: int = 1
-    """Минимальная площадь кластера-кандидата в пикселях."""
-    max_blob_area: int = 200
-    """Максимальная площадь кластера-кандидата в пикселях."""
-
-    # --- Фильтр Калмана (модель постоянной скорости: cx, cy, vx, vy) ---
-    kalman_process_noise_pos: float = 0.5
-    """Шум процесса по позиции (насколько точно модель описывает движение)."""
-    kalman_process_noise_vel: float = 2.0
-    """Шум процесса по скорости (насколько допускаем ускорение цели)."""
-    kalman_measurement_noise: float = 1.5
-    """Шум измерения (ошибка определения центроида blob в пикселях)."""
-
-    # --- Зона захвата (gate) ---
-    min_gate: int = 25
-    """Минимальный радиус поиска кандидата вокруг прогноза Калмана (пиксели)."""
-    gate_growth: int = 4
-    """Расширение радиуса поиска за каждый пропущенный кадр (пиксели/кадр)."""
-    max_gate: int = 120
-    """Максимальный радиус поиска (физический предел, пиксели)."""
-    max_speed_px_per_frame: float = 8.0
-    """Жёсткий физический предел скорости объекта (пиксели/кадр).
-    Кандидат за пределами last_good_bbox + max_speed * lost_frames отклоняется."""
-
-    # --- Устойчивость к потере ---
-    max_lost_frames: int = 30
-    """Максимальный пропуск кадров без обнаружения, после которого трекер уходит в IDLE."""
-
-    # --- Обработка замутнения ---
-    blur_hold_enabled: bool = True
-    """Включить режим удержания прогноза при размытом кадре."""
-    blur_sharpness_drop_ratio: float = 0.60
-    """Если резкость кадра упала ниже baseline * ratio, считаем кадр замутнённым."""
-
-    # --- Выбор цели кликом ---
-    click_search_radius: int = 60
-    """Радиус поиска ближайшего blob к точке клика (пиксели)."""
-    click_fallback_size: int = 12
-    """Размер запасного бокса, если рядом с кликом нет кандидатов."""
-
-
-@dataclass
+@dataclass(frozen=True, slots=True)
 class VisualizationConfig:
     """Параметры отрисовки поверх кадра."""
 
@@ -248,8 +40,42 @@ class VisualizationConfig:
     show_global_motion: bool = True
     line_thickness: int = 1
 
+    @classmethod
+    def from_mapping(cls, values: dict[str, object]) -> VisualizationConfig:
+        """Создать конфигурацию отрисовки из TOML-секции."""
+        kwargs: dict[str, object] = {}
+        source = dict(values)
 
-@dataclass
+        for field_name in (
+            "show_search_region",
+            "show_predicted_box",
+            "show_global_motion",
+        ):
+            value = source.pop(field_name, None)
+            if value is None:
+                continue
+            if not isinstance(value, bool):
+                raise RuntimeError(f"visualization.{field_name} must be boolean.")
+            kwargs[field_name] = value
+
+        line_thickness = source.pop("line_thickness", None)
+        if line_thickness is not None:
+            if isinstance(line_thickness, bool) or not isinstance(line_thickness, int):
+                raise RuntimeError("visualization.line_thickness must be integer.")
+            kwargs["line_thickness"] = line_thickness
+
+        if source:
+            raise RuntimeError(f"Unsupported visualization params: {tuple(sorted(source))}.")
+
+        return cls(**kwargs)
+
+    def __post_init__(self) -> None:
+        """Проверить параметры отрисовки."""
+        if self.line_thickness <= 0:
+            raise ValueError("line_thickness must be greater than 0.")
+
+
+@dataclass(frozen=True, slots=True)
 class NeuralConfig:
     """Параметры нейросетевого контура."""
 
@@ -263,28 +89,147 @@ class NeuralConfig:
     max_reacquire_distance_factor: float = 2.6
     prefer_same_class: bool = True
 
+    @classmethod
+    def from_mapping(cls, values: dict[str, object]) -> NeuralConfig:
+        """Создать конфигурацию нейросетевого контура из TOML-секции."""
+        source = dict(values)
+        kwargs: dict[str, object] = {}
 
-@dataclass
+        for field_name in (
+            "engine_name",
+            "model_path",
+            "tracker_config_path",
+            "device",
+        ):
+            value = source.pop(field_name, None)
+            if value is None:
+                continue
+            if not isinstance(value, str):
+                raise RuntimeError(f"neural.{field_name} must be string.")
+            kwargs[field_name] = value
+
+        for field_name in (
+            "confidence_threshold",
+            "iou_threshold",
+            "max_reacquire_distance_factor",
+        ):
+            value = source.pop(field_name, None)
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise RuntimeError(f"neural.{field_name} must be number.")
+            kwargs[field_name] = float(value)
+
+        prefer_same_class = source.pop("prefer_same_class", None)
+        if prefer_same_class is not None:
+            if not isinstance(prefer_same_class, bool):
+                raise RuntimeError("neural.prefer_same_class must be boolean.")
+            kwargs["prefer_same_class"] = prefer_same_class
+
+        allowed_classes = source.pop("allowed_classes", None)
+        if allowed_classes is not None:
+            if not isinstance(allowed_classes, (list, tuple)):
+                raise RuntimeError("neural.allowed_classes must be array.")
+            parsed_classes: list[int] = []
+            for item in allowed_classes:
+                if isinstance(item, bool) or not isinstance(item, int):
+                    raise RuntimeError("neural.allowed_classes items must be integer.")
+                parsed_classes.append(item)
+            kwargs["allowed_classes"] = tuple(parsed_classes)
+
+        if source:
+            raise RuntimeError(f"Unsupported neural params: {tuple(sorted(source))}.")
+
+        return cls(**kwargs)
+
+    def __post_init__(self) -> None:
+        """Проверить параметры нейросетевого контура."""
+        if not 0.0 <= self.confidence_threshold <= 1.0:
+            raise ValueError("confidence_threshold must be in range [0, 1].")
+        if not 0.0 <= self.iou_threshold <= 1.0:
+            raise ValueError("iou_threshold must be in range [0, 1].")
+        if self.max_reacquire_distance_factor <= 0.0:
+            raise ValueError("max_reacquire_distance_factor must be greater than 0.")
+
+
+@dataclass(frozen=True, slots=True)
+class TargetRecoveryConfig:
+    """Конфигурация стадии повторного захвата цели."""
+
+    # Включает или отключает всю стадию восстановления цели.
+    enabled: bool = False
+    # Операции восстановления цели в порядке fallback-цепочки.
+    operations: tuple[TargetRecovererConfig, ...] = ()
+    # После скольких потерянных кадров pipeline начинает recovery.
+    min_lost_frames: int = 5
+    # Сколько подряд подтверждений нужно для перехода RECOVERING -> TRACKING.
+    confirm_frames: int = 3
+    # Максимальная длина окна восстановления перед окончательной потерей цели.
+    recovery_window_frames: int = 30
+
+    @property
+    def enabled_operations(self) -> tuple[TargetRecovererConfig, ...]:
+        """Вернуть активные операции recovery."""
+        if not self.enabled:
+            return ()
+        return self.operations
+
+    def __post_init__(self) -> None:
+        """Проверить параметры стадии восстановления цели."""
+        if self.enabled and not self.operations:
+            raise ValueError("Target recovery is enabled, but no operations are configured.")
+        if self.min_lost_frames < 0:
+            raise ValueError("min_lost_frames must be greater than or equal to 0.")
+        if self.confirm_frames <= 0:
+            raise ValueError("confirm_frames must be greater than 0.")
+        if self.recovery_window_frames <= 0:
+            raise ValueError("recovery_window_frames must be greater than 0.")
+
+
+@dataclass(frozen=True, slots=True)
 class TrackerPreset:
     """Готовый набор настроек для конкретного сценария."""
 
     name: str
-    preprocessing: PreprocessingConfig
-    global_motion: GlobalMotionConfig
-    moving_area_detection: MovingAreaDetectionConfig
-    target_candidate_extraction: TargetCandidateExtractionConfig
-    target_recovery: TargetRecoveryConfig
+    frame_preprocessing: StageConfig[FramePreprocessorConfig]
+    frame_stabilization: StageConfig[FrameStabilizerConfig]
+    motion_localization: StageConfig[MotionLocalizationConfig]
+    candidate_formation: StageConfig[CandidateFormerConfig]
     candidate_filtering: StageConfig[CandidateFilterConfig]
-    click_selection: ClickSelectionConfig
+    target_selection: StageConfig[TargetSelectionConfig]
+    target_tracking: StageConfig[TargetTrackerConfig]
+    target_recovery: TargetRecoveryConfig
     visualization: VisualizationConfig
     pipeline_kind: str = "manual_click_classical"
-    opencv_tracker: OpenCVTrackerConfig | None = None
-    yolo_tracker: YoloTrackerConfig | None = None
-    irst_tracker: IrstTrackerConfig | None = None
     neural: NeuralConfig | None = None
 
+    @property
+    def preprocessing(self) -> StageConfig[FramePreprocessorConfig]:
+        """Совместимый алиас старого имени preprocessing."""
+        return self.frame_preprocessing
 
-@dataclass(frozen=True)
+    @property
+    def global_motion(self) -> StageConfig[FrameStabilizerConfig]:
+        """Совместимый алиас старого имени global_motion."""
+        return self.frame_stabilization
+
+    @property
+    def moving_area_detection(self) -> StageConfig[MotionLocalizationConfig]:
+        """Совместимый алиас старого имени moving_area_detection."""
+        return self.motion_localization
+
+    @property
+    def target_candidate_extraction(self) -> StageConfig[CandidateFormerConfig]:
+        """Совместимый алиас старого имени target_candidate_extraction."""
+        return self.candidate_formation
+
+    @property
+    def click_selection(self) -> StageConfig[TargetSelectionConfig]:
+        """Совместимый алиас старого имени click_selection."""
+        return self.target_selection
+
+
+@dataclass(frozen=True, slots=True)
 class PresetPresentation:
     """Человеческое описание пресета для GUI."""
 
@@ -293,7 +238,16 @@ class PresetPresentation:
     description: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
+class _PresetIndexRecord:
+    """Краткие данные пресета без полной сборки stage-конфигов."""
+
+    name: str
+    presentation: PresetPresentation
+    file_path: Path
+
+
+@dataclass(frozen=True, slots=True)
 class _PresetRecord:
     """Полный набор данных одного загруженного пресета."""
 
@@ -303,212 +257,313 @@ class _PresetRecord:
 
 
 def _read_toml(path: Path) -> dict[str, object]:
-    """Читает TOML-файл пресета и возвращает его как словарь."""
-
+    """Прочитать TOML-файл пресета и вернуть его как словарь."""
     with path.open("rb") as file:
         loaded = tomllib.load(file)
 
     if not isinstance(loaded, dict):
-        raise RuntimeError(f"Пресет {path} не удалось прочитать как TOML-словарь.")
+        raise RuntimeError(f"Preset {path} was not loaded as a TOML dictionary.")
+
     return loaded
 
 
-def _normalize_opencv_tracker_section(section: dict[str, object]) -> dict[str, object]:
-    """Подготавливает значения секции `[opencv_tracking]` перед созданием OpenCVTrackerConfig."""
-
-    normalized = dict(section)
-    scales = normalized.get("scales")
-    if scales is not None:
-        normalized["scales"] = tuple(float(value) for value in scales)
-    return normalized
-
-
-def _normalize_neural_section(section: dict[str, object]) -> dict[str, object]:
-    """Подготавливает значения секции `neural` перед созданием dataclass."""
-
-    normalized = dict(section)
-    allowed_classes = normalized.get("allowed_classes")
-    if allowed_classes is not None:
-        normalized["allowed_classes"] = tuple(int(value) for value in allowed_classes)
-    return normalized
-
-
-def _normalize_preprocessing_section(section: dict[str, object]) -> dict[str, object]:
-    """Подготавливает список атомарных операций preprocessing перед созданием dataclass."""
-
-    normalized = dict(section)
-    methods = normalized.get("methods")
-    if methods is not None:
-        if isinstance(methods, str):
-            normalized["methods"] = (methods,)
-        else:
-            normalized["methods"] = tuple(str(value) for value in methods)
-    return normalized
-
-
-def _normalize_target_recovery_section(section: dict[str, object]) -> dict[str, object]:
-    """Подготавливает значения секции `target_recovery` перед созданием dataclass."""
-
-    normalized = dict(section)
-    scales = normalized.get("scales")
-    if scales is not None:
-        normalized["scales"] = tuple(float(value) for value in scales)
-    return normalized
-
-
 def _build_presentation(preset_name: str, meta: dict[str, object]) -> PresetPresentation:
-    """Собирает описание пресета для интерфейса."""
-
+    """Собрать описание пресета для интерфейса."""
     title = str(meta.get("title") or preset_name)
-    tooltip = str(meta.get("tooltip") or f"Пресет {preset_name}")
+    tooltip = str(meta.get("tooltip") or f"Preset {preset_name}")
     description = str(meta.get("description") or tooltip)
+
     return PresetPresentation(title=title, tooltip=tooltip, description=description)
 
 
-def _build_preset_record(path: Path) -> _PresetRecord:
-    """Создаёт полное описание пресета из одного TOML-файла."""
-
-    data = _read_toml(path)
+def _parse_meta(path: Path, data: dict[str, object]) -> tuple[str, PresetPresentation]:
+    """Прочитать идентификатор и описание пресета."""
     meta = data.get("meta", {})
-    if not isinstance(meta, dict):
-        raise RuntimeError(f"В пресете {path} секция [meta] должна быть таблицей.")
 
-    pipeline = data.get("pipeline", {})
-    if pipeline is None:
-        pipeline = {}
-    if not isinstance(pipeline, dict):
-        raise RuntimeError(f"В пресете {path} секция [pipeline] должна быть таблицей.")
+    if not isinstance(meta, dict):
+        raise RuntimeError(f"Preset {path} section [meta] must be a TOML table.")
 
     preset_name = str(meta.get("id") or path.stem).strip()
     if not preset_name:
-        raise RuntimeError(f"В пресете {path} не задано имя.")
+        raise RuntimeError(f"Preset {path} has empty id.")
 
-    preprocessing = PreprocessingConfig(
-        **_normalize_preprocessing_section(dict(data.get("preprocessing", {})))
-    )
-    global_motion = GlobalMotionConfig(**dict(data.get("global_motion", {})))
-    moving_area_detection = MovingAreaDetectionConfig(**dict(data.get("motion_localization", {})))
-    target_candidate_extraction = TargetCandidateExtractionConfig(
-        **dict(data.get("candidate_formation", {}))
-    )
-    target_recovery = TargetRecoveryConfig(
-        **_normalize_target_recovery_section(dict(data.get("target_recovery", {})))
+    return preset_name, _build_presentation(preset_name=preset_name, meta=meta)
+
+
+def _parse_pipeline_kind(data: dict[str, object], path: Path) -> str:
+    """Прочитать тип pipeline из секции [pipeline]."""
+    pipeline = data.get("pipeline", {})
+
+    if pipeline is None:
+        return "manual_click_classical"
+
+    if not isinstance(pipeline, dict):
+        raise RuntimeError(f"Preset {path} section [pipeline] must be a TOML table.")
+
+    return str(pipeline.get("kind") or "manual_click_classical").strip() or "manual_click_classical"
+
+
+def _parse_frame_preprocessing(data: dict[str, object]) -> StageConfig[FramePreprocessorConfig]:
+    """Прочитать конфигурацию стадии frame_preprocessing."""
+    from ..stages.frame_preprocessing import FRAME_PREPROCESSOR_CONFIG_CLASSES
+
+    return StageConfigParser.parse(
+        section=dict(data.get("frame_preprocessing", {})),
+        stage_name="frame_preprocessing",
+        config_classes=FRAME_PREPROCESSOR_CONFIG_CLASSES,
     )
 
-    candidate_filtering = StageConfigParser.parse(
+
+def _parse_frame_stabilization(data: dict[str, object]) -> StageConfig[FrameStabilizerConfig]:
+    """Прочитать конфигурацию стадии frame_stabilization."""
+    from ..stages.frame_stabilization import FRAME_STABILIZER_CONFIG_CLASSES
+
+    return StageConfigParser.parse(
+        section=dict(data.get("frame_stabilization", {})),
+        stage_name="frame_stabilization",
+        config_classes=FRAME_STABILIZER_CONFIG_CLASSES,
+    )
+
+
+def _parse_motion_localization(data: dict[str, object]) -> StageConfig[MotionLocalizationConfig]:
+    """Прочитать конфигурацию стадии motion_localization."""
+    from ..stages.motion_localization import MOTION_LOCALIZER_CONFIG_CLASSES
+
+    return StageConfigParser.parse(
+        section=dict(data.get("motion_localization", {})),
+        stage_name="motion_localization",
+        config_classes=MOTION_LOCALIZER_CONFIG_CLASSES,
+    )
+
+
+def _parse_candidate_formation(data: dict[str, object]) -> StageConfig[CandidateFormerConfig]:
+    """Прочитать конфигурацию стадии candidate_formation."""
+    from ..stages.candidate_formation import CANDIDATE_FORMER_CONFIG_CLASSES
+
+    return StageConfigParser.parse(
+        section=dict(data.get("candidate_formation", {})),
+        stage_name="candidate_formation",
+        config_classes=CANDIDATE_FORMER_CONFIG_CLASSES,
+    )
+
+
+def _parse_candidate_filtering(data: dict[str, object]) -> StageConfig[CandidateFilterConfig]:
+    """Прочитать конфигурацию стадии candidate_filtering."""
+    from ..stages.candidate_filtering import CANDIDATE_FILTER_CONFIG_CLASSES
+
+    return StageConfigParser.parse(
         section=dict(data.get("candidate_filtering", {})),
         stage_name="candidate_filtering",
         config_classes=CANDIDATE_FILTER_CONFIG_CLASSES,
     )
 
-    click_selection = ClickSelectionConfig(**dict(data.get("click_selection", {})))
-    visualization = VisualizationConfig(**dict(data.get("visualization", {})))
-    pipeline_kind = str(pipeline.get("kind") or "manual_click_classical").strip() or "manual_click_classical"
 
-    opencv_tracking_data = data.get("opencv_tracking")
-    opencv_tracker: OpenCVTrackerConfig | None = None
-    if isinstance(opencv_tracking_data, dict):
-        opencv_tracker = OpenCVTrackerConfig(
-            **_normalize_opencv_tracker_section(opencv_tracking_data)
-        )
+def _parse_target_selection(data: dict[str, object]) -> StageConfig[TargetSelectionConfig]:
+    """Прочитать конфигурацию стадии target_selection."""
+    from ..stages.target_selection import TARGET_SELECTION_CONFIG_CLASSES
 
-    yolo_tracking_data = data.get("yolo_tracking")
-    yolo_tracker: YoloTrackerConfig | None = None
-    if isinstance(yolo_tracking_data, dict):
-        yolo_tracker = YoloTrackerConfig(**dict(yolo_tracking_data))
+    return StageConfigParser.parse(
+        section=dict(data.get("target_selection", {})),
+        stage_name="target_selection",
+        config_classes=TARGET_SELECTION_CONFIG_CLASSES,
+    )
 
-    irst_tracking_data = data.get("irst_tracking")
-    irst_tracker: IrstTrackerConfig | None = None
-    if isinstance(irst_tracking_data, dict):
-        irst_tracker = IrstTrackerConfig(**dict(irst_tracking_data))
 
+def _parse_target_tracking(data: dict[str, object]) -> StageConfig[TargetTrackerConfig]:
+    """Прочитать конфигурацию стадии target_tracking."""
+    from ..stages.target_tracking import TARGET_TRACKER_CONFIG_CLASSES
+
+    return StageConfigParser.parse(
+        section=dict(data.get("target_tracking", {})),
+        stage_name="target_tracking",
+        config_classes=TARGET_TRACKER_CONFIG_CLASSES,
+    )
+
+
+def _parse_target_recovery(data: dict[str, object]) -> TargetRecoveryConfig:
+    """Прочитать конфигурацию стадии target_recovery."""
+    from ..stages.target_recovery import TARGET_RECOVERER_CONFIG_CLASSES
+
+    section = dict(data.get("target_recovery", {}))
+    stage_config = StageConfigParser.parse(
+        section=section,
+        stage_name="target_recovery",
+        config_classes=TARGET_RECOVERER_CONFIG_CLASSES,
+    )
+
+    return TargetRecoveryConfig(
+        enabled=stage_config.enabled,
+        operations=stage_config.operations,
+        min_lost_frames=_read_int(section, "min_lost_frames", default=5),
+        confirm_frames=_read_int(section, "confirm_frames", default=3),
+        recovery_window_frames=_read_int(section, "recovery_window_frames", default=30),
+    )
+
+
+def _parse_visualization(data: dict[str, object]) -> VisualizationConfig:
+    """Прочитать конфигурацию отрисовки."""
+    return VisualizationConfig.from_mapping(dict(data.get("visualization", {})))
+
+
+def _parse_neural(data: dict[str, object]) -> NeuralConfig | None:
+    """Прочитать конфигурацию нейросетевого контура."""
     neural_section = data.get("neural")
-    neural = None
-    if isinstance(neural_section, dict) and neural_section:
-        neural = NeuralConfig(**_normalize_neural_section(neural_section))
+
+    if not isinstance(neural_section, dict) or not neural_section:
+        return None
+
+    return NeuralConfig.from_mapping(dict(neural_section))
+
+
+def _inject_neural_config(
+    target_tracking: StageConfig[TargetTrackerConfig],
+    neural: NeuralConfig | None,
+    path: Path,
+) -> StageConfig[TargetTrackerConfig]:
+    """Передать NeuralConfig в YOLO-tracker operation."""
+    if not target_tracking.operations:
+        return target_tracking
+
+    from ..stages.target_tracking.operations import YoloTargetTrackerConfig
+
+    patched_operations: list[TargetTrackerConfig] = []
+
+    for operation in target_tracking.operations:
+        if isinstance(operation, YoloTargetTrackerConfig):
+            if neural is None:
+                raise RuntimeError(
+                    f"Preset {path} uses YOLO target tracker, but section [neural] is missing."
+                )
+            patched_operations.append(replace(operation, neural_config=neural))
+        else:
+            patched_operations.append(operation)
+
+    return StageConfig(
+        enabled=target_tracking.enabled,
+        operations=tuple(patched_operations),
+    )
+
+
+def _read_int(section: dict[str, object], key: str, default: int) -> int:
+    """Прочитать целочисленное поле секции."""
+    value = section.get(key, default)
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RuntimeError(f"target_recovery.{key} must be integer.")
+
+    return value
+
+
+def _build_preset_record(path: Path) -> _PresetRecord:
+    """Создать полное описание пресета из одного TOML-файла."""
+    data = _read_toml(path)
+    preset_name, presentation = _parse_meta(path=path, data=data)
+    neural = _parse_neural(data)
+    target_tracking = _inject_neural_config(
+        target_tracking=_parse_target_tracking(data),
+        neural=neural,
+        path=path,
+    )
 
     return _PresetRecord(
         preset=TrackerPreset(
             name=preset_name,
-            preprocessing=preprocessing,
-            global_motion=global_motion,
-            moving_area_detection=moving_area_detection,
-            target_candidate_extraction=target_candidate_extraction,
-            target_recovery=target_recovery,
-            candidate_filtering=candidate_filtering,
-            click_selection=click_selection,
-            visualization=visualization,
-            pipeline_kind=pipeline_kind,
-            opencv_tracker=opencv_tracker,
-            yolo_tracker=yolo_tracker,
-            irst_tracker=irst_tracker,
+            frame_preprocessing=_parse_frame_preprocessing(data),
+            frame_stabilization=_parse_frame_stabilization(data),
+            motion_localization=_parse_motion_localization(data),
+            candidate_formation=_parse_candidate_formation(data),
+            candidate_filtering=_parse_candidate_filtering(data),
+            target_selection=_parse_target_selection(data),
+            target_tracking=target_tracking,
+            target_recovery=_parse_target_recovery(data),
+            visualization=_parse_visualization(data),
+            pipeline_kind=_parse_pipeline_kind(data=data, path=path),
             neural=neural,
         ),
-        presentation=_build_presentation(preset_name, meta),
+        presentation=presentation,
         file_path=path,
     )
 
 
 @lru_cache(maxsize=1)
-def _load_preset_catalog() -> dict[str, _PresetRecord]:
-    """Читает все TOML-пресеты из корневой папки `presets`."""
-
+def _load_preset_index() -> dict[str, _PresetIndexRecord]:
+    """Прочитать список TOML-пресетов без сборки тяжёлых stage-конфигов."""
     if not PRESETS_DIR.exists():
-        raise RuntimeError(f"Каталог с пресетами не найден: {PRESETS_DIR}")
+        raise RuntimeError(f"Preset directory was not found: {PRESETS_DIR}")
 
-    catalog: dict[str, _PresetRecord] = {}
+    index: dict[str, _PresetIndexRecord] = {}
+
     for path in sorted(PRESETS_DIR.glob("*.toml")):
         data = _read_toml(path)
         if "meta" not in data:
             continue
-        record = _build_preset_record(path)
-        if record.preset.name in catalog:
-            raise RuntimeError(f"Имя пресета {record.preset.name!r} повторяется в {path.name}.")
-        catalog[record.preset.name] = record
 
-    if not catalog:
-        raise RuntimeError(f"В каталоге {PRESETS_DIR} не найдено ни одного TOML-пресета.")
-    return catalog
+        preset_name, presentation = _parse_meta(path=path, data=data)
+
+        if preset_name in index:
+            raise RuntimeError(f"Preset name {preset_name!r} is duplicated in {path.name}.")
+
+        index[preset_name] = _PresetIndexRecord(
+            name=preset_name,
+            presentation=presentation,
+            file_path=path,
+        )
+
+    if not index:
+        raise RuntimeError(f"No TOML presets were found in {PRESETS_DIR}.")
+
+    return index
+
+
+@lru_cache(maxsize=None)
+def _load_preset_record(name: str) -> _PresetRecord:
+    """Загрузить и собрать один пресет по имени."""
+    index = _load_preset_index()
+    record = index[name]
+
+    return _build_preset_record(record.file_path)
 
 
 def _resolve_preset_name(name: str) -> str:
-    """Приводит имя пресета к реально существующему варианту."""
-
+    """Привести имя пресета к реально существующему варианту."""
     requested = (name or "").strip()
-    catalog = _load_preset_catalog()
-    if requested in catalog:
+    index = _load_preset_index()
+
+    if requested in index:
         return requested
-    if DEFAULT_PRESET_NAME in catalog:
+
+    if DEFAULT_PRESET_NAME in index:
         return DEFAULT_PRESET_NAME
-    return next(iter(catalog))
+
+    return next(iter(index))
 
 
 def get_available_preset_names() -> tuple[str, ...]:
-    """Возвращает список доступных пресетов в порядке загрузки."""
-
-    catalog = _load_preset_catalog()
+    """Вернуть список доступных пресетов в порядке загрузки."""
+    index = _load_preset_index()
     ordered_names: list[str] = []
 
-    if DEFAULT_PRESET_NAME in catalog:
+    if DEFAULT_PRESET_NAME in index:
         ordered_names.append(DEFAULT_PRESET_NAME)
 
-    ordered_names.extend(name for name in catalog.keys() if name != DEFAULT_PRESET_NAME)
+    ordered_names.extend(name for name in index.keys() if name != DEFAULT_PRESET_NAME)
+
     return tuple(ordered_names)
 
 
 def build_preset(name: str) -> TrackerPreset:
-    """Возвращает полную конфигурацию пресета по имени."""
-
+    """Вернуть полную конфигурацию пресета по имени."""
     preset_name = _resolve_preset_name(name)
-    return deepcopy(_load_preset_catalog()[preset_name].preset)
+
+    return deepcopy(_load_preset_record(preset_name).preset)
 
 
 def get_preset_presentation(name: str) -> PresetPresentation:
-    """Возвращает описание пресета для интерфейса."""
-
+    """Вернуть описание пресета для интерфейса."""
     preset_name = _resolve_preset_name(name)
-    return _load_preset_catalog()[preset_name].presentation
+
+    return _load_preset_index()[preset_name].presentation
 
 
-# Готовый список имён для GUI и CLI, чтобы не грузить каталог вручную в каждом месте.
+# Готовый список имён для GUI и CLI без тяжёлой сборки stage-конфигов.
 AVAILABLE_PRESETS = get_available_preset_names()

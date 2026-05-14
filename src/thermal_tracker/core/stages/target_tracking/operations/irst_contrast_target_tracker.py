@@ -26,20 +26,20 @@ class IrstContrastTargetTrackerConfig:
     operation_type: ClassVar[TargetTrackerType] = TargetTrackerType.IRST_CONTRAST
 
     # Радиус поиска цели вокруг клика при старте трека.
-    click_search_radius: int = 32
+    click_search_radius: int = 60
     # Размер fallback-bbox, если по клику не найден контрастный blob.
-    click_fallback_size: int = 16
+    click_fallback_size: int = 12
 
     # Размер ядра для оценки локального объекта.
     filter_kernel: int = 3
     # Размер ядра для оценки локального фона.
-    background_kernel: int = 15
+    background_kernel: int = 11
     # Минимальное значение карты контраста для попадания в blob-маску.
-    contrast_threshold: float = 18.0
+    contrast_threshold: float = 12.0
     # Минимальная площадь blob-кандидата.
-    min_blob_area: int = 4
+    min_blob_area: int = 1
     # Максимальная площадь blob-кандидата.
-    max_blob_area: int = 900
+    max_blob_area: int = 200
     # Включает морфологическое объединение близких контрастных пикселей.
     dilate_candidates: bool = True
     # Размер ядра объединения близких контрастных пикселей.
@@ -48,32 +48,32 @@ class IrstContrastTargetTrackerConfig:
     candidate_dilate_iterations: int = 1
 
     # Минимальный радиус search gate вокруг прогноза.
-    min_gate: int = 24
+    min_gate: int = 25
     # Максимальный радиус search gate вокруг прогноза.
-    max_gate: int = 96
+    max_gate: int = 120
     # Увеличение search gate за каждый потерянный кадр.
-    gate_growth: int = 8
+    gate_growth: int = 4
     # Максимальная физически допустимая скорость цели в пикселях за кадр.
-    max_speed_px_per_frame: float = 24.0
+    max_speed_px_per_frame: float = 8.0
     # Множитель запаса для физического ограничения скорости.
     physical_gate_lost_frame_multiplier: float = 1.5
 
     # Максимальное количество кадров потери перед сбросом трека.
-    max_lost_frames: int = 15
+    max_lost_frames: int = 30
 
     # Шум позиции в Kalman-фильтре.
-    kalman_process_noise_pos: float = 1e-2
+    kalman_process_noise_pos: float = 0.5
     # Шум скорости в Kalman-фильтре.
-    kalman_process_noise_vel: float = 1e-1
+    kalman_process_noise_vel: float = 2.0
     # Шум измерения позиции в Kalman-фильтре.
-    kalman_measurement_noise: float = 1e-1
+    kalman_measurement_noise: float = 1.5
     # Начальная ковариация ошибки Kalman-фильтра.
     kalman_initial_error_cov: float = 4.0
 
     # Включает удержание трека при замутнении кадра.
     blur_hold_enabled: bool = True
     # Доля падения резкости, после которой кадр считается деградированным.
-    blur_sharpness_drop_ratio: float = 0.45
+    blur_sharpness_drop_ratio: float = 0.60
     # Верхний перцентиль Лапласиана для оценки резкости.
     sharpness_percentile: float = 90.0
     # Верхняя граница центральной ROI по высоте для оценки резкости.

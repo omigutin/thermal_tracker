@@ -24,35 +24,35 @@ class ContrastComponentTargetSelectorConfig:
     operation_type: ClassVar[TargetSelectorType] = TargetSelectorType.CONTRAST_COMPONENT
 
     # Базовый радиус локального участка вокруг точки клика.
-    search_radius: int = 32
+    search_radius: int = 80
     # Максимальный радиус повторной попытки выбора цели.
-    max_retry_radius: int = 96
+    max_retry_radius: int = 180
     # Множитель радиуса для повторной попытки выбора цели.
-    retry_scale: float = 1.8
+    retry_scale: float = 1.6
     # Отступ вокруг найденной области.
-    padding: int = 2
+    padding: int = 8
     # Размер fallback-bbox, если нормальная сегментация не сработала.
-    fallback_size: int = 16
+    fallback_size: int = 36
 
     # Минимальная площадь компоненты, которую можно считать целью.
-    min_component_area: int = 24
+    min_component_area: int = 30
     # Максимальная доля площади patch, которую может занимать компонента.
-    max_component_fill: float = 0.55
+    max_component_fill: float = 0.45
     # Максимальная доля ширины/высоты patch, которую может занимать bbox компоненты.
     max_patch_span_ratio: float = 0.85
     # Максимальный рост bbox при уточнении уже выбранной цели.
     max_refine_growth: float = 1.8
 
     # Радиус локального окна вокруг клика для оценки шума и разброса яркости.
-    local_window_radius: int = 3
+    local_window_radius: int = 5
     # Коэффициент, который превращает локальное стандартное отклонение в допуск яркости.
-    similarity_sigma: float = 2.0
+    similarity_sigma: float = 1.35
     # Минимальный допустимый порог похожести по яркости.
-    min_tolerance: int = 8
+    min_tolerance: int = 10
     # Максимальный допустимый порог похожести по яркости.
     max_tolerance: int = 42
     # Минимальный контраст объекта относительно окружения.
-    min_object_contrast: float = 8.0
+    min_object_contrast: float = 6.0
 
     # Размер ядра морфологической очистки бинарной маски.
     mask_morphology_kernel: int = 3
@@ -79,7 +79,7 @@ class ContrastComponentTargetSelectorConfig:
     # Множитель радиуса локального окна для поиска более выразительного пикселя.
     snap_radius_multiplier: float = 2.0
     # Дополнительный запас радиуса при поиске более выразительного пикселя.
-    snap_radius_padding: int = 2
+    snap_radius_padding: int = 8
     # Размер ядра размытия перед оценкой выразительности пикселей.
     snap_blur_kernel: int = 5
     # Штраф за удалённость пикселя от исходной точки клика.
@@ -91,7 +91,7 @@ class ContrastComponentTargetSelectorConfig:
     refine_patch_min_radius_ratio: float = 0.5
 
     # Толщина фонового кольца вокруг компоненты для оценки контраста.
-    background_ring: int = 4
+    background_ring: int = 10
     # Минимальное количество фоновых пикселей для оценки контраста.
     min_background_pixels: int = 10
     # Уверенность для компактного fallback-выбора.
@@ -169,15 +169,15 @@ class ContrastComponentTargetSelectorConfig:
     oversized_area_min_pixels: int = 260
 
     # Минимальный внешний отступ вокруг seed-области для поиска полного объекта.
-    expansion_margin: int = 4
+    expansion_margin: int = 18
     # Множитель размера seed-области для расчёта рабочего отступа.
     expansion_margin_seed_scale: float = 0.5
     # Максимальная площадь seed-области, которую имеет смысл расширять.
     expansion_seed_max_area: int = 3000
     # Максимальная доля рабочего patch, которую может занять расширенная область.
-    max_expanded_fill: float = 0.65
+    max_expanded_fill: float = 0.58
     # Доля контраста между объектом и фоном для построения порога foreground.
-    foreground_fraction: float = 0.5
+    foreground_fraction: float = 0.36
 
     # Размер ядра морфологической очистки расширенной маски.
     expansion_morphology_kernel: int = 5

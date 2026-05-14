@@ -30,7 +30,7 @@ class FeatureAffineFrameStabilizerConfig:
     # Минимальное количество хороших совпадений для оценки движения.
     min_inliers: int = 8
     # Максимально допустимый сдвиг относительно размера кадра.
-    max_shift_ratio: float = 0.4
+    max_shift_ratio: float = 0.35
     # Минимальная доля inlier-точек для признания результата корректным.
     min_inlier_ratio: float = 0.35
 

@@ -19,7 +19,7 @@ class GaussianBlurFramePreprocessorConfig(BaseFramePreprocessorConfig):
     # Тип операции для связи конфигурации с фабрикой.
     operation_type: ClassVar[FramePreprocessorType] = FramePreprocessorType.GAUSSIAN_BLUR
     # Размер ядра гауссова фильтра; 1 отключает фактическое сглаживание.
-    kernel: int = 3
+    kernel: int = 5
 
     def __post_init__(self) -> None:
         """Проверить корректность параметров гауссова сглаживания."""

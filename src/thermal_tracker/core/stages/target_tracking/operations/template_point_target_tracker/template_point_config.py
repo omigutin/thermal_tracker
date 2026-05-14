@@ -28,63 +28,63 @@ class TemplatePointTargetTrackerConfig:
     # Базовый отступ области поиска вокруг прогноза.
     search_margin: int = 24
     # Узкий отступ области поиска при хорошем прогнозе по точкам.
-    point_search_margin: int = 12
+    point_search_margin: int = 14
     # Рост области поиска за каждый потерянный кадр.
-    lost_search_growth: int = 8
+    lost_search_growth: int = 18
     # Количество потерянных кадров, после которого разрешён поиск по всему кадру.
-    full_frame_after: int = 12
+    full_frame_after: int = 999
     # Максимальное количество потерянных кадров перед сбросом трека.
-    max_lost_frames: int = 20
+    max_lost_frames: int = 70
 
     # Порог уверенного template tracking.
-    track_threshold: float = 0.45
+    track_threshold: float = 0.42
     # Порог повторного захвата после потери.
-    reacquire_threshold: float = 0.52
+    reacquire_threshold: float = 0.5
     # Порог, после которого можно обновлять адаптивный шаблон.
     template_update_threshold: float = 0.62
     # Коэффициенты масштабирования bbox при template search.
-    scales: tuple[float, ...] = (0.85, 1.0, 1.15)
+    scales: tuple[float, ...] = (0.72, 0.84, 0.94, 1.0, 1.08, 1.18, 1.32)
     # Штраф за удалённость кандидата от прогноза.
-    distance_penalty: float = 0.35
+    distance_penalty: float = 0.14
 
     # Скорость обновления адаптивного шаблона.
-    template_alpha: float = 0.08
+    template_alpha: float = 0.12
     # Сглаживание остаточной скорости цели относительно движения камеры.
-    velocity_alpha: float = 0.25
+    velocity_alpha: float = 0.45
 
     # Максимальный сдвиг центра при обычном сопровождении.
-    max_tracking_center_shift: float = 1.25
+    max_tracking_center_shift: float = 1.6
     # Максимальный сдвиг центра при повторном захвате.
-    max_reacquire_center_shift: float = 1.45
+    max_reacquire_center_shift: float = 2.8
     # Рост допустимого сдвига центра при долгой потере.
-    reacquire_center_growth: float = 0.03
+    reacquire_center_growth: float = 0.32
 
     # Минимальное сжатие bbox между соседними измерениями.
     max_size_shrink: float = 0.72
     # Максимальный рост bbox между соседними измерениями.
-    max_size_growth: float = 1.28
+    max_size_growth: float = 1.25
     # Минимальное сжатие bbox при повторном захвате.
     max_size_shrink_on_reacquire: float = 0.55
     # Максимальный рост bbox при повторном захвате.
-    max_size_growth_on_reacquire: float = 1.65
+    max_size_growth_on_reacquire: float = 1.6
     # Максимальный рост bbox относительно стартового размера.
-    max_size_growth_from_initial: float = 2.4
+    max_size_growth_from_initial: float = 4.0
 
     # Максимальное количество кадров потери после контакта цели с краем кадра.
     edge_exit_max_lost_frames: int = 4
     # Отступ от края кадра для фиксации возможного выхода цели.
-    edge_exit_margin: int = 3
+    edge_exit_margin: int = 10
 
     # Максимальное количество опорных точек на цели.
     max_feature_points: int = 40
     # Минимальное количество опорных точек для использования прогноза.
-    min_feature_points: int = 5
+    min_feature_points: int = 6
     # Минимальное качество точки для cv2.goodFeaturesToTrack.
-    feature_quality_level: float = 0.01
+    feature_quality_level: float = 0.02
     # Минимальная дистанция между опорными точками.
-    feature_min_distance: int = 4
+    feature_min_distance: int = 6
     # Интервал принудительного обновления опорных точек.
-    feature_refresh_interval: int = 8
+    feature_refresh_interval: int = 6
 
     # Размер окна LK optical flow.
     optical_flow_window_size: int = 21
@@ -100,9 +100,9 @@ class TemplatePointTargetTrackerConfig:
     # Включает удержание прогноза при деградации кадра.
     blur_hold_enabled: bool = True
     # Доля падения резкости, после которой кадр считается деградированным.
-    blur_sharpness_drop_ratio: float = 0.45
+    blur_sharpness_drop_ratio: float = 0.5
     # Максимальное количество кадров удержания после blur.
-    blur_hold_max_frames: int = 8
+    blur_hold_max_frames: int = 120
     # Рост допустимого отклонения центра при blur hold.
     blur_hold_center_growth: float = 0.06
     # Скорость адаптации базовой резкости.

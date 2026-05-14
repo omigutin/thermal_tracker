@@ -22,13 +22,13 @@ class PhaseCorrelationFrameStabilizerConfig:
     # Тип операции для связи конфигурации с фабрикой.
     operation_type: ClassVar[FrameStabilizerType] = FrameStabilizerType.PHASE_CORRELATION
     # Масштаб кадра перед оценкой смещения.
-    downscale: float = 1.0
+    downscale: float = 0.5
     # Размер ядра размытия перед фазовой корреляцией.
-    blur_kernel: int = 1
+    blur_kernel: int = 9
     # Минимальная уверенность phase correlation для признания результата корректным.
-    min_response: float = 0.05
+    min_response: float = 0.03
     # Максимально допустимый сдвиг относительно размера кадра.
-    max_shift_ratio: float = 0.4
+    max_shift_ratio: float = 0.35
 
     def __post_init__(self) -> None:
         """Проверить корректность параметров стабилизации кадра."""
