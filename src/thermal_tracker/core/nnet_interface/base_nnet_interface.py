@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 
 
 class BaseNnetInterface(ABC):
@@ -21,5 +21,5 @@ class BaseNnetInterface(ABC):
     is_ready = False
 
     @abstractmethod
-    def track(self, frame: np.ndarray) -> list[DetectedObject]:
+    def track(self, frame: np.ndarray) -> list[CandidateFormerResult]:
         """Обрабатывает кадр и возвращает найденные объекты."""

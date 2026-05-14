@@ -6,7 +6,7 @@ from typing import ClassVar, Self
 from ....target_selection.config import TargetSelectionConfig
 from ....target_selection.operations import ContrastComponentTargetSelectorConfig
 from ...type import TargetTrackerType
-from .....config import PresetFieldReader
+from .....config.preset_field_reader import PresetFieldReader
 
 
 @dataclass(frozen=True, slots=True)

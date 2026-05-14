@@ -6,7 +6,7 @@ from typing import ClassVar, Self, Optional
 import cv2
 import numpy as np
 
-from ....config import PresetFieldReader
+from ....config.preset_field_reader import PresetFieldReader
 from ....domain.models import BoundingBox, ProcessedFrame
 from ..result import TargetPolarity, TargetSelectorResult
 from ..type import TargetSelectorType

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from .models import ProcessedFrame
 from ..stages.target_tracking.result import TargetTrackingResult
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..stages.motion_localization import MotionLocalizerResult
 
@@ -36,5 +36,5 @@ class AutoScenarioStepResult:
     frame: ProcessedFrame
     global_motion: FrameStabilizerResult
     motion_result: MotionLocalizerResult
-    raw_objects: list[DetectedObject]
-    filtered_objects: list[DetectedObject]
+    raw_objects: list[CandidateFormerResult]
+    filtered_objects: list[CandidateFormerResult]

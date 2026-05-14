@@ -18,7 +18,7 @@ import numpy as np
 
 from ..config import TrackerPreset, build_preset
 from ..domain.models import ProcessedFrame
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import AutoScenarioStepResult, SessionRuntimeState
 from ..stages.candidate_filtering import CandidateFilterManager
@@ -45,8 +45,8 @@ class AutoMotionTrackingPipeline:
             mask=np.zeros((1, 1), dtype=np.uint8),
             source_name="empty",
         )
-        self.current_raw_objects: list[DetectedObject] = []
-        self.current_filtered_objects: list[DetectedObject] = []
+        self.current_raw_objects: list[CandidateFormerResult] = []
+        self.current_filtered_objects: list[CandidateFormerResult] = []
 
     @property
     def preset_name(self) -> str:

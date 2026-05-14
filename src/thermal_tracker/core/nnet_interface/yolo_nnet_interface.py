@@ -3,7 +3,7 @@
 Используем его как временную реализацию до подключения общей библиотеки:
 - модель принимает кадр;
 - внешний tracker (ByteTrack/BoT-SORT) выдаёт track id;
-- на выходе получаем список `DetectedObject`.
+- на выходе получаем список `CandidateFormerResult`.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from ultralytics import YOLO
 
 from ..config import NeuralConfig, PROJECT_ROOT
 from ..domain.models import BoundingBox
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from .base_nnet_interface import BaseNnetInterface
 
 
@@ -56,7 +56,7 @@ class YoloNnetInterface(BaseNnetInterface):
         self._track_mode_enabled = self._check_track_mode_available()
         self.mode_name = "track" if self._track_mode_enabled else "predict"
 
-    def track(self, frame: np.ndarray) -> list[DetectedObject]:
+    def track(self, frame: np.ndarray) -> list[CandidateFormerResult]:
         """Запускает модель и возвращает детекции в доменных структурах."""
 
         model_frame = _ensure_three_channel_frame(frame)
@@ -75,7 +75,7 @@ class YoloNnetInterface(BaseNnetInterface):
         track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else np.full((xyxy.shape[0],), -1, dtype=int)
         names = result.names or {}
 
-        detections: list[DetectedObject] = []
+        detections: list[CandidateFormerResult] = []
         for index, box in enumerate(xyxy):
             x1, y1, x2, y2 = [int(round(value)) for value in box.tolist()]
             bbox = BoundingBox(
@@ -92,7 +92,7 @@ class YoloNnetInterface(BaseNnetInterface):
             )
             label = str(names.get(class_id, f"class_{class_id}"))
             detections.append(
-                DetectedObject(
+                CandidateFormerResult(
                     bbox=bbox,
                     area=bbox.area,
                     confidence=float(confs[index]) if index < len(confs) else 0.0,

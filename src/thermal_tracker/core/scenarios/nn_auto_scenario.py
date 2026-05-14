@@ -18,7 +18,7 @@ import numpy as np
 from ..config import TrackerPreset, build_preset
 from ..domain.models import ProcessedFrame, TrackerState
 from ..stages.target_tracking.result import TargetTrackingResult
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..nnet_interface import YoloNnetInterface
@@ -40,7 +40,7 @@ class AutoNeuralDetectionPipeline:
 
         self.current_frame: ProcessedFrame | None = None
         self.current_snapshot: TargetTrackingResult = self._build_snapshot(FrameStabilizerResult(), (), "Нейросеть ещё не запускалась.")
-        self._candidate_objects: tuple[DetectedObject, ...] = ()
+        self._candidate_objects: tuple[CandidateFormerResult, ...] = ()
 
     @property
     def preset_name(self) -> str:
@@ -49,7 +49,7 @@ class AutoNeuralDetectionPipeline:
         return self.preset.name
 
     @property
-    def candidate_objects(self) -> tuple[DetectedObject, ...]:
+    def candidate_objects(self) -> tuple[CandidateFormerResult, ...]:
         """Текущие объекты, найденные моделью на последнем кадре."""
 
         return self._candidate_objects
@@ -101,7 +101,7 @@ class AutoNeuralDetectionPipeline:
     def _build_snapshot(
         self,
         motion: FrameStabilizerResult,
-        detections: tuple[DetectedObject, ...],
+        detections: tuple[CandidateFormerResult, ...],
         message: str,
     ) -> TargetTrackingResult:
         """Собирает компактный снимок состояния для GUI."""

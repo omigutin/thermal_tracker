@@ -14,7 +14,7 @@ from ..config import TrackerPreset, build_preset
 from ..stages.target_tracking.type import TargetTrackerType
 from ..domain.models import ProcessedFrame
 from ..stages.target_tracking.result import TargetTrackingResult
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..stages.frame_preprocessing import FramePreprocessorManager
@@ -52,7 +52,7 @@ class ManualClickNeuralPipeline:
         return self.preset.name
 
     @property
-    def candidate_objects(self) -> tuple[DetectedObject, ...]:
+    def candidate_objects(self) -> tuple[CandidateFormerResult, ...]:
         """Возвращает список текущих детекций, которые можно показать в GUI."""
 
         return self.tracker.latest_detections

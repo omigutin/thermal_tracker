@@ -16,7 +16,7 @@ from ..config import TrackerPreset, build_preset
 from ..stages.target_tracking.type import TargetTrackerType
 from ..domain.models import BoundingBox, ProcessedFrame, TrackerState
 from ..stages.target_tracking.result import TargetTrackingResult
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..domain.runtime import ScenarioStepResult, SessionRuntimeState
 from ..stages.frame_preprocessing import FramePreprocessorManager
@@ -86,7 +86,7 @@ class ManualClickTrackingPipeline:
         return self.preset.name
 
     @property
-    def candidate_objects(self) -> tuple[DetectedObject, ...]:
+    def candidate_objects(self) -> tuple[CandidateFormerResult, ...]:
         """Классический pipeline не хранит список отдельных детекций для GUI."""
 
         return ()

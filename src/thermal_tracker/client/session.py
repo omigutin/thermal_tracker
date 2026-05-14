@@ -8,7 +8,7 @@ from thermal_tracker.core.config import TrackerPreset, build_preset
 from thermal_tracker.core.connections.frames import OpenCvVideoSource
 from thermal_tracker.core.domain.models import ProcessedFrame
 from thermal_tracker.core.stages.target_tracking.result import TargetTrackingResult
-from thermal_tracker.core.stages.candidate_formation.result import DetectedObject
+from thermal_tracker.core.stages.candidate_formation.result import CandidateFormerResult
 from thermal_tracker.core.domain.runtime import SessionRuntimeState
 from thermal_tracker.core.scenarios import ScenarioFactory
 
@@ -62,7 +62,7 @@ class TrackingSession:
         return self.pipeline.current_snapshot
 
     @property
-    def candidate_objects(self) -> tuple[DetectedObject, ...]:
+    def candidate_objects(self) -> tuple[CandidateFormerResult, ...]:
         """Текущие кандидаты для GUI, если активный pipeline умеет их отдавать."""
 
         return tuple(getattr(self.pipeline, "candidate_objects", ()))

@@ -26,7 +26,7 @@ from .models import (
 )
 from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.target_selection.result import TargetSelectorResult
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from .runtime import AutoScenarioStepResult, ScenarioStepResult, SessionRuntimeState
 

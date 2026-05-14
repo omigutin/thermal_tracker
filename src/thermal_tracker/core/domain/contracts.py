@@ -17,7 +17,7 @@ from .models import (
 )
 from ..stages.target_tracking.result import TargetTrackingResult
 from ..stages.target_selection.result import TargetSelectorResult
-from ..stages.candidate_formation.result import DetectedObject
+from ..stages.candidate_formation.result import CandidateFormerResult
 from ..stages.frame_stabilization.result import FrameStabilizerResult
 from ..stages.motion_localization import MotionLocalizerResult
 
@@ -84,7 +84,7 @@ class MotionDetector(Protocol):
 class ObjectBuilder(Protocol):
     """Собирает объекты из маски движения или другого детектора."""
 
-    def build(self, frame: ProcessedFrame, detection: MotionLocalizerResult) -> list[DetectedObject]:
+    def build(self, frame: ProcessedFrame, detection: MotionLocalizerResult) -> list[CandidateFormerResult]:
         """Преобразует результат детектора в список объектов."""
 
 
@@ -94,9 +94,9 @@ class FalseTargetFilter(Protocol):
     def filter(
         self,
         frame: ProcessedFrame,
-        objects: list[DetectedObject],
+        objects: list[CandidateFormerResult],
         motion: FrameStabilizerResult,
-    ) -> list[DetectedObject]:
+    ) -> list[CandidateFormerResult]:
         """Возвращает только те объекты, которым доверяем."""
 
 

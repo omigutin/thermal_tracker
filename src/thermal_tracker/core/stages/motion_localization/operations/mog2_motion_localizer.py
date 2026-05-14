@@ -6,7 +6,7 @@ from typing import ClassVar, Self
 import cv2
 import numpy as np
 
-from ....config import PresetFieldReader
+from ....config.preset_field_reader import PresetFieldReader
 from ....domain.models import ProcessedFrame
 from ..result import MotionLocalizerResult
 from ..type import MotionLocalizationType

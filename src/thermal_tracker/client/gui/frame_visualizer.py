@@ -13,7 +13,7 @@ import numpy as np
 from thermal_tracker.core.config import VisualizationConfig
 from thermal_tracker.core.domain.models import BoundingBox, ProcessedFrame, TrackerState
 from thermal_tracker.core.stages.target_tracking.result import TargetTrackingResult
-from thermal_tracker.core.stages.candidate_formation.result import DetectedObject
+from thermal_tracker.core.stages.candidate_formation.result import CandidateFormerResult
 
 
 def _draw_box(
@@ -57,7 +57,7 @@ def _format_state_name(state: TrackerState) -> str:
     return state.value
 
 
-def _build_candidate_label(detection: DetectedObject) -> str:
+def _build_candidate_label(detection: CandidateFormerResult) -> str:
     """Собирает короткую подпись для нейросетевого кандидата."""
 
     if detection.track_id is not None:
@@ -122,7 +122,7 @@ def render_frame(
     visualization: VisualizationConfig,
     preset_name: str,
     pending_click: tuple[int, int] | None = None,
-    candidate_objects: tuple[DetectedObject, ...] | list[DetectedObject] | None = None,
+    candidate_objects: tuple[CandidateFormerResult, ...] | list[CandidateFormerResult] | None = None,
     *,
     include_status_bar: bool = True,
 ) -> np.ndarray:

@@ -5,9 +5,9 @@ from typing import ClassVar, Self
 
 import numpy as np
 
-from ....config import PresetFieldReader
+from ....config.preset_field_reader import PresetFieldReader
 from ....domain.models import ProcessedFrame
-from ...candidate_formation.result import DetectedObject
+from ...candidate_formation.result import CandidateFormerResult
 from ...frame_stabilization.result import FrameStabilizerResult
 from ..type import CandidateFilterType
 from .base_candidate_filter import BaseCandidateFilter
@@ -66,15 +66,15 @@ class ContrastCandidateFilter(BaseCandidateFilter):
     def apply(
         self,
         frame: ProcessedFrame,
-        objects: list[DetectedObject],
+        objects: list[CandidateFormerResult],
         motion: FrameStabilizerResult,
-    ) -> list[DetectedObject]:
+    ) -> list[CandidateFormerResult]:
         """Удалить объекты с недостаточным контрастом относительно фона."""
 
         _ = motion
 
         normalized = frame.normalized.astype(np.float32, copy=False)
-        result: list[DetectedObject] = []
+        result: list[CandidateFormerResult] = []
 
         for obj in objects:
             contrast = self._calculate_object_contrast(normalized=normalized, obj=obj, )
@@ -86,7 +86,7 @@ class ContrastCandidateFilter(BaseCandidateFilter):
 
         return result
 
-    def _calculate_object_contrast(self, normalized: np.ndarray, obj: DetectedObject, ) -> float | None:
+    def _calculate_object_contrast(self, normalized: np.ndarray, obj: CandidateFormerResult, ) -> float | None:
         """Посчитать контраст объекта относительно локального фона."""
 
         bbox = obj.bbox.clamp(normalized.shape)

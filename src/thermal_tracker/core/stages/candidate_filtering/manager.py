@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ...domain.models import ProcessedFrame
-from ..candidate_formation.result import DetectedObject
+from ..candidate_formation.result import CandidateFormerResult
 from ..frame_stabilization.result import FrameStabilizerResult
 from .config import CandidateFilterConfig
 from .factory import CandidateFilterFactory
@@ -29,7 +29,7 @@ class CandidateFilterManager:
         """Вернуть подготовленные runtime-фильтры в порядке применения."""
         return self._operations
 
-    def apply(self, frame: ProcessedFrame, objects: list[DetectedObject], motion: FrameStabilizerResult) -> list[DetectedObject]:
+    def apply(self, frame: ProcessedFrame, objects: list[CandidateFormerResult], motion: FrameStabilizerResult) -> list[CandidateFormerResult]:
         """Последовательно применить runtime-фильтры к списку кандидатов."""
 
         current = list(objects)
