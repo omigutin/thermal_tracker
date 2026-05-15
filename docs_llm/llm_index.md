@@ -1,190 +1,289 @@
 # LLM Index: Thermal Tracker
 
-## Purpose
+## Назначение документа
 
-This is the main entry point for any LLM working with the project.
+Это главный входной документ для любой LLM, работающей с проектом `thermal_tracker`.
 
-Read this file first, then load the specific documents required for the current task.
-
----
-
-## Documents
-
-| Document | Purpose | When to read |
-|---|---|---|
-| `docs_llm/llm_global_rules.md` | Общие правила работы с пользователем и кодом | Всегда перед задачей |
-| `docs_llm/llm_project_context.md` | Краткий контекст проекта `thermal_tracker` | Всегда перед проектной задачей |
-| `docs_llm/llm_project_architecture.md` | Архитектура stages, presets, parsing, managers, factories | Перед изменением архитектуры, импортов, конфигов, stages |
-| `docs_llm/llm_project_handoff.md` | Текущее состояние рефакторинга и известные риски | Перед продолжением текущего этапа |
-| `docs_llm/llm_project_tasks.md` | Текущая конкретная задача для LLM | Всегда перед выполнением |
+Сначала прочитай этот файл, затем переходи к документам из таблицы ниже. Если пользователь просит обновить контекст, правила, handoff или задачу, используй раздел “Команды обновления документов”.
 
 ---
 
-## Required reading order
+## Обязательный порядок чтения
+
+Перед выполнением любой проектной задачи прочитать:
 
 1. `docs_llm/llm_global_rules.md`
 2. `docs_llm/llm_project_context.md`
 3. `docs_llm/llm_project_architecture.md`
 4. `docs_llm/llm_project_handoff.md`
 5. `docs_llm/llm_project_tasks.md`
+6. `docs_llm/llm_worklog.md`, если файл существует
+
+`llm_worklog.md` читается последним: он содержит историю предыдущих этапов и может быть большим.
 
 ---
 
-## Обязательная фиксация после каждого этапа
+## Карта документов
 
-После завершения каждого существенного этапа LLM обязана обновить LLM-документы.
+| Документ | Назначение | Когда читать |
+|---|---|---|
+| `docs_llm/llm_global_rules.md` | Общие правила работы с пользователем, кодом, Git, тестами и документацией | Всегда |
+| `docs_llm/llm_project_context.md` | Краткий стабильный контекст проекта `thermal_tracker` | Всегда перед проектной задачей |
+| `docs_llm/llm_project_architecture.md` | Стабильная архитектура stages, preset-layer, parsing, managers, factories | Перед изменениями архитектуры, imports, configs, stages |
+| `docs_llm/llm_project_handoff.md` | Текущее состояние ремонта, известные проблемы, ограничения | Перед продолжением текущего этапа |
+| `docs_llm/llm_project_tasks.md` | Текущая исполняемая задача для LLM | Всегда перед выполнением |
+| `docs_llm/llm_worklog.md` | Хронологический журнал выполненных этапов | Перед продолжением незавершённой работы и перед новым автономным запуском |
+| `CLAUDE.md` | Короткий входной файл для Claude Code | Entry point для Claude Code |
+
+---
+
+## Главный принцип маршрутизации
+
+Не смешивай разные виды информации.
+
+- Общие правила работы с пользователем и кодом → `llm_global_rules.md`
+- Краткий стабильный контекст проекта → `llm_project_context.md`
+- Стабильные архитектурные решения проекта → `llm_project_architecture.md`
+- Текущее состояние перехода / ремонта → `llm_project_handoff.md`
+- Текущая исполняемая задача → `llm_project_tasks.md`
+- Хронологический журнал выполненных этапов → `llm_worklog.md`
+
+Если неясно, куда добавить информацию, не размазывай её по нескольким файлам. Зафиксируй вопрос в отчёте или спроси пользователя.
+
+---
+
+## Обязательная фиксация после существенного этапа
+
+После каждого существенного этапа LLM обязана обновить документы.
 
 Существенными этапами считаются:
 
-1. аудит без изменений;
+1. аудит;
 2. исправление импортов;
-3. стабилизация `core/preset`;
-4. стабилизация `core/stages/config`;
+3. стабилизация пакета или стадии;
+4. миграция пресетов;
 5. добавление или исправление тестов;
 6. запуск проверок;
 7. исправление ошибок после проверок;
-8. обновление обычной документации;
-9. подготовка итогового отчёта.
+8. обновление документации;
+9. подготовка итогового отчёта;
+10. локальный Git-коммит этапа, если коммиты разрешены текущей задачей.
 
-После каждого этапа обновить:
+После каждого существенного этапа обновить:
 
-- `docs_llm/llm_project_handoff.md` — что сделано, что найдено, что осталось, какие риски;
-- `docs_llm/llm_project_tasks.md` — текущий статус задачи и следующий рекомендуемый шаг.
+- `docs_llm/llm_project_handoff.md` — текущее состояние, что сделано, что осталось, риски;
+- `docs_llm/llm_project_tasks.md` — актуальный статус задачи и следующий шаг;
+- `docs_llm/llm_worklog.md` — добавить новую запись в конец файла.
 
-Если в ходе работы принято стабильное архитектурное решение, обновить также:
+Если принято стабильное архитектурное решение, обновить также:
 
 - `docs_llm/llm_project_architecture.md`.
 
-Если найдено новое общее правило работы с кодом или LLM, не добавлять его автоматически в глобальные правила. 
-Сначала вынести в отчёт как предложение.
+Если найдено новое общее правило работы с кодом или LLM, не добавлять его автоматически в глобальные правила. Сначала вынести предложение в отчёт.
 
 ---
 
-## Document update commands
+## Команды обновления документов
 
-When the user says one of the commands below, update the corresponding document.
+Когда пользователь использует одну из команд ниже, обнови соответствующие документы.
 
 ### “Зафиксируй это в моих правилах написания кода”
 
-Update:
+Обновить:
 
 `docs_llm/llm_global_rules.md`
 
-Meaning:
+Правила:
 
-- add or refine a general coding/workflow rule;
-- place it into the correct section;
-- avoid duplicating existing rules;
-- if the rule conflicts with an existing rule, report the conflict before editing.
+- добавить или уточнить общее правило;
+- поместить его в подходящий раздел;
+- не дублировать существующее правило;
+- если новое правило конфликтует со старым, сначала явно описать конфликт.
 
 ### “Обнови глобальные правила LLM”
 
-Update:
+Обновить:
 
 `docs_llm/llm_global_rules.md`
 
-Meaning:
-
-- update general rules that apply across projects;
-- do not add project-specific architecture here.
+Не добавлять туда проектную архитектуру.
 
 ### “Обнови контекст проекта”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_context.md`
 
-Meaning:
+Правила:
 
-- update stable project facts;
-- keep it short;
-- do not put detailed architecture here.
+- держать документ коротким;
+- добавлять только стабильные сведения о проекте;
+- не добавлять подробную архитектуру;
+- не добавлять временный статус ремонта.
 
 ### “Обнови архитектуру проекта”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_architecture.md`
 
-Meaning:
+Правила:
 
-- update stage/preset architecture;
-- document accepted architectural decisions;
-- do not include temporary task status here.
+- фиксировать только устойчивые архитектурные решения;
+- не добавлять временный статус;
+- если решение не принято, вынести его в handoff или report как вопрос.
 
 ### “Обнови handoff”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_handoff.md`
 
-Meaning:
+Правила:
 
-- update current refactoring status;
-- add known issues, risks, completed work, next safe steps;
-- keep it useful for another LLM continuing the work.
+- зафиксировать текущее состояние;
+- добавить известные проблемы, риски, завершённые шаги, безопасные следующие шаги;
+- документ должен помогать другой LLM продолжить работу без догадок.
 
 ### “Обнови задачу для LLM”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_tasks.md`
 
-Meaning:
+Правила:
 
-- rewrite the current task;
-- include goal, scope, restrictions, expected report format, checks;
-- this file may be fully overwritten each stage.
+- файл можно полностью перезаписать;
+- указать цель, scope, разрешённые действия, запреты, формат отчёта, проверки;
+- если задача автономная, явно указать разрешённые действия и разрешённые Git-команды.
 
 ### “Сформируй задачу для другой LLM”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_tasks.md`
 
-Optional update:
+При необходимости обновить:
 
 `docs_llm/llm_project_handoff.md`
 
-Meaning:
+Правила:
 
-- create a precise executable task;
-- include strict restrictions;
-- require audit/plan before changes unless user explicitly allows implementation.
+- задача должна быть исполнимой;
+- запреты должны быть явными;
+- если работа автономная, явно указать границы автономности;
+- если нужен сначала аудит без правок, написать это первым пунктом.
 
 ### “Зафиксируй архитектурное решение”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_architecture.md`
 
-Optional update:
+При необходимости обновить:
 
 `docs_llm/llm_project_handoff.md`
 
-Meaning:
+Правила:
 
-- add the decision to architecture if it is stable;
-- add to handoff if it affects current refactoring.
+- если решение стабильное — добавить в architecture;
+- если решение влияет на текущий ремонт — добавить в handoff;
+- не записывать временный эксперимент как архитектурное решение.
 
 ### “Зафиксируй текущее состояние”
 
-Update:
+Обновить:
 
 `docs_llm/llm_project_handoff.md`
 
-Meaning:
+Добавить запись в:
 
-- record what is done, what is broken, what remains, what not to touch.
+`docs_llm/llm_worklog.md`
+
+### “Зафиксируй этап”
+
+Обновить:
+
+- `docs_llm/llm_project_handoff.md`
+- `docs_llm/llm_project_tasks.md`
+- `docs_llm/llm_worklog.md`
+
+Если текущая задача разрешает локальные коммиты, сделать один локальный коммит этапа.
 
 ---
 
-## Rules for updating LLM documents
+## Правила работы с `llm_worklog.md`
 
-- Do not scatter the same rule across multiple files.
-- `llm_global_rules.md` is for cross-project rules.
-- `llm_project_context.md` is for short stable project context.
-- `llm_project_architecture.md` is for stable architecture.
-- `llm_project_handoff.md` is for current transition state.
-- `llm_project_tasks.md` is for the current executable task.
-- If unsure where a rule belongs, ask the user before editing.
+`llm_worklog.md` — журнал, а не место для архитектурных правил.
+
+После каждого этапа добавлять запись в конец:
+
+```text
+## YYYY-MM-DD HH:MM — Название этапа
+
+### Что сделано
+- ...
+
+### Затронутые файлы
+- ...
+
+### Проверки
+- Выполнены:
+- Не выполнены:
+
+### Найденные проблемы
+- ...
+
+### Что осталось
+- ...
+
+### Риски
+- ...
+
+### Коммит
+- <hash или "не выполнялся">
+```
+
+Не переписывать старые записи без необходимости.
+
+---
+
+## Правила локальных коммитов
+
+По умолчанию любые Git-команды запрещены.
+
+Исключение: если текущий `docs_llm/llm_project_tasks.md` явно разрешает локальные коммиты, LLM может использовать только команды, перечисленные в этом task-файле.
+
+Даже в автономном режиме запрещены:
+
+```bash
+git push
+git pull
+git reset
+git rebase
+git checkout
+git clean
+git stash
+```
+
+Перед коммитом LLM обязана:
+
+1. выполнить `git status`;
+2. проверить список изменённых файлов;
+3. не добавлять `outputs/`, `sandbox/`, `__pycache__/`, `.pytest_cache/`, временные копии проекта, видео, веса моделей, датасеты, секреты;
+4. обновить `llm_project_handoff.md`, `llm_project_tasks.md`, `llm_worklog.md`;
+5. сделать один коммит на один завершённый этап.
+
+---
+
+## Если задача прервалась
+
+Если предыдущая LLM остановилась из-за лимитов:
+
+1. прочитать `llm_worklog.md`;
+2. выполнить `git status`;
+3. выполнить `git log --oneline -n 10`, если Git-команды разрешены текущей задачей;
+4. определить, какие изменения уже сделаны и закоммичены;
+5. не повторять уже выполненный этап;
+6. сначала привести документы LLM в согласованное состояние, если они конфликтуют;
+7. продолжить с ближайшего незавершённого этапа.

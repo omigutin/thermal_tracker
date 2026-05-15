@@ -2,9 +2,9 @@
 
 ## Назначение документа
 
-Этот документ фиксирует текущую архитектуру stage/preset-слоя проекта `thermal_tracker`.
+Этот документ фиксирует текущую стабильную архитектуру stage/preset-слоя проекта `thermal_tracker`.
 
-Если этот документ конфликтует со старым кодом, считать возможным, что код устарел. Перед изменениями нужно проверить фактическое состояние файлов и согласовать план с пользователем.
+Если этот документ конфликтует со старым кодом, считать возможным, что код устарел. Перед изменениями нужно проверить фактическое состояние файлов и согласовать план с пользователем или действовать только в рамках текущего `llm_project_tasks.md`.
 
 ---
 
@@ -14,7 +14,14 @@
 
 `Preset` — описание одного сценария обработки.
 
-Preset хранит метаданные, тип pipeline, порядок экземпляров стадий и настройки стадий.
+Preset хранит:
+
+- метаданные;
+- тип pipeline;
+- порядок экземпляров стадий;
+- настройки стадий.
+
+Preset — внешний слой настройки, обычно описанный в TOML-файле.
 
 ### Config
 
@@ -39,11 +46,17 @@ target_tracking
 target_recovery
 ```
 
-Stage type соответствует директории в `src/thermal_tracker/core/stages/`.
+Stage type соответствует директории в:
+
+```text
+src/thermal_tracker/core/stages/
+```
 
 ### Stage name
 
 `stage_name` — имя конкретного экземпляра стадии в одном пресете.
+
+Пример:
 
 ```toml
 [pipeline]
@@ -128,7 +141,13 @@ PresetPipeline
 StagePreset
 ```
 
-`Preset` не должен иметь фиксированных полей вида `frame_preprocessing`, `target_tracking`, `target_recovery`.
+`Preset` не должен иметь фиксированных полей вида:
+
+```text
+frame_preprocessing
+target_tracking
+target_recovery
+```
 
 Вместо этого используется ordered pipeline:
 
@@ -154,11 +173,38 @@ raw dict from TOML
 
 `PresetFieldReader` не должен использоваться в runtime pipeline, managers или factories.
 
+Актуальный путь:
+
+```text
+src/thermal_tracker/core/preset/field_reader.py
+```
+
+Актуальный класс:
+
+```text
+PresetFieldReader
+```
+
+Не использовать путь:
+
+```text
+src/thermal_tracker/core/preset/preset_field_reader.py
+```
+
+если пользователь отдельно не изменит это архитектурное решение.
+
 ### `parser.py`
 
 Содержит `PresetParser`.
 
-`PresetParser` отвечает за чтение `[meta]`, `[pipeline]`, проверку `stage_order`, чтение `[stages.<stage_name>]`, выбор stage parser по `type` и сборку `Preset`.
+`PresetParser` отвечает за:
+
+- чтение `[meta]`;
+- чтение `[pipeline]`;
+- проверку `stage_order`;
+- чтение `[stages.<stage_name>]`;
+- выбор stage parser по `type`;
+- сборку `Preset`.
 
 `PresetParser` не должен знать параметры конкретных операций.
 
@@ -168,6 +214,13 @@ raw dict from TOML
 
 ```text
 stage_type → operation config classes
+```
+
+Пример:
+
+```text
+candidate_filtering → CANDIDATE_FILTER_CONFIG_CLASSES
+target_tracking     → TARGET_TRACKER_CONFIG_CLASSES
 ```
 
 ---
@@ -193,6 +246,8 @@ src/thermal_tracker/core/stages/config/
 enabled: bool
 operations: tuple[OperationConfigT, ...]
 ```
+
+Он не знает конкретные стадии и бизнес-логику.
 
 ### `StageConfigParser`
 
@@ -275,11 +330,32 @@ stage_name/
     └── concrete_operation.py
 ```
 
+Если стадии нужны вложенные алгоритмы, можно использовать подкаталоги внутри `operations/`.
+
+Пример:
+
+```text
+target_selection/
+└── operations/
+    └── contrast_component/
+        ├── __init__.py
+        ├── contrast_component_target_selector.py
+        ├── contrast_component_mask_builder.py
+        └── ...
+```
+
 ---
 
 ## Operation config pattern
 
 Config-класс конкретной операции должен лежать рядом с runtime-классом операции.
+
+В одном файле обычно находятся:
+
+```text
+ConcreteOperationConfig
+ConcreteOperation
+```
 
 Config-класс должен иметь:
 
@@ -290,19 +366,56 @@ from_mapping(...)
 __post_init__()
 ```
 
-`from_mapping()` должен принять `dict[str, object]`, создать `PresetFieldReader`, прочитать только явно заданные поля, вызвать `ensure_empty()` и вернуть `cls(**kwargs)`.
+`from_mapping()` должен:
+
+1. принять `dict[str, object]`;
+2. создать `PresetFieldReader`;
+3. прочитать только явно заданные поля;
+4. вызвать `ensure_empty()`;
+5. вернуть `cls(**kwargs)`.
 
 Дефолты должны жить в dataclass-полях config-класса.
 
+Нельзя дублировать дефолты внутри `from_mapping()`.
+
 ---
 
-## Runtime, Factory, Manager
+## Runtime operation pattern
 
-Runtime-класс операции должен хранить config-объект и не дублировать поля config-класса.
+Runtime-класс операции должен хранить config-объект.
 
-Factory стадии принимает operation config-объекты, пропускает disabled operations, создаёт runtime-объект по типу config, не знает TOML и не работает с raw dict.
+Runtime-класс не должен дублировать поля config-класса.
 
-Manager стадии принимает `StageConfig[OperationConfig]` или специальный stage-level config, проверяет `stage.enabled`, создаёт runtime operations через factory и выполняет операции в порядке из config.
+---
+
+## Factory pattern
+
+Factory стадии:
+
+- принимает operation config-объекты;
+- пропускает `operation_config.enabled == False`;
+- создаёт runtime-объект по типу config;
+- не знает TOML;
+- не работает с raw dict;
+- не валидирует поля TOML;
+- не знает `StageConfig`, если это не нужно.
+
+Для небольшого числа операций допустим явный `if isinstance(...)`, чтобы не ломать типизацию IDE.
+
+---
+
+## Manager pattern
+
+Manager стадии:
+
+- принимает `StageConfig[OperationConfig]` или специальный stage-level config;
+- проверяет `stage.enabled`;
+- через factory создаёт runtime operations;
+- хранит runtime operations в `tuple`;
+- выполняет операции в порядке из config;
+- не знает TOML;
+- не знает строковые operation type;
+- не парсит raw dict.
 
 ---
 
@@ -352,6 +465,11 @@ recovery_window_frames
 
 ## Deprecated / old files
 
-Файлы с постфиксом `_OLD.py` игнорировать.
+Файлы с постфиксом `_OLD.py` и `__OLD.py` игнорировать.
 
-LLM не должен импортировать из них, исправлять их, включать их в тесты или учитывать как актуальную архитектуру.
+LLM не должен:
+
+- импортировать из них;
+- исправлять их;
+- включать их в тесты;
+- учитывать их как актуальную архитектуру.
