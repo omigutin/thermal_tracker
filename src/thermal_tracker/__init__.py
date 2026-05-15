@@ -19,7 +19,10 @@ _ALIASES = {
     "errors": "thermal_tracker.core.errors",
     "logging": "thermal_tracker.core.logging",
     "nnet_interface": "thermal_tracker.core.nnet_interface",
-    "processing_stages": "thermal_tracker.core.processing_stages",
+    # `processing_stages` сознательно удалён: модуля
+    # `thermal_tracker.core.processing_stages` нет, новый путь -
+    # `thermal_tracker.core.stages`. Алиас под именем `stages` не вводится,
+    # чтобы не расширять публичный API без согласования.
     "scenarios": "thermal_tracker.core.scenarios",
     "storage": "thermal_tracker.core.storage",
     "runtime_app": "thermal_tracker.server.runtime_app",

@@ -1,4 +1,4 @@
-# LLM Project Tasks: Import audit and preset parser stabilization
+# LLM Project Tasks: Verify on Windows side + plan remaining cleanup
 
 ## Назначение документа
 
@@ -11,180 +11,143 @@
 3. `docs_llm/llm_project_architecture.md`
 4. `docs_llm/llm_project_handoff.md`
 5. `docs_llm/llm_project_tasks.md`
+6. `docs_llm/llm_worklog.md`
 
 ---
 
-## Главная цель этапа
+## Контекст
 
-Провести безопасный аудит после stage/preset refactoring.
+Предыдущий этап («аудит + минимальные импортные правки + тесты на парсинг»)
+завершён. Подробности — в `llm_worklog.md` от 2026-05-15.
 
-Сначала нужен отчёт без правок. Код менять только после подтверждения пользователя.
+Что сделано:
 
----
+- `core/preset/parser.py` — починен импорт `TargetRecoveryConfig`
+  (теперь из `..stages.target_recovery.config`, не из `_OLD`).
+- `src/thermal_tracker/__init__.py` — удалён битый alias `processing_stages`.
+- Добавлены unit-тесты на `PresetFieldReader`, `StageConfig`,
+  `StageConfigParser`, `TargetRecoveryConfig`.
 
-## Область проверки
+Что **не** удалось запустить из текущего окружения:
 
-Проверять:
-
-```text
-src/thermal_tracker/core/preset/
-src/thermal_tracker/core/stages/
-src/thermal_tracker/core/config/
-presets/
-docs_llm/
-```
-
-Игнорировать:
-
-```text
-*_OLD.py
-__pycache__/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-.git/
-artifacts/
-videos/
-datasets/
-weights/
-```
+- `python -m compileall` на реальном дереве — мешает stale `__pycache__` и
+  артефакты virtiofs;
+- `pytest` на реальном дереве — `pytest` есть только в Windows `.venv`,
+  доступа к нему из Linux нет.
 
 ---
 
-## Этап 1. Аудит без изменений
+## Главная цель ближайшего этапа
 
-Не менять файлы.
-
-Нужно найти:
-
-1. Битые импорты.
-2. Импорты из файлов `_OLD.py`.
-3. Старые импорты:
-   - `core.config.stage_config`
-   - `core.config.stage_config_parser`
-   - `core.config.preset_field_reader`
-4. Старые имена классов и сущностей:
-   - `TrackSnapshot`
-   - `BaseSingleTargetTracker`
-   - `ClickTargetSelector`
-   - `YOLO_TRACK`
-   - `NeuralConfig` в root Preset
-   - `VisualizationConfig` в core preset
-5. Абсолютные импорты внутри `thermal_tracker`, которые можно заменить на относительные без риска.
-6. Циклические импорты.
-7. Места, где runtime pipeline работает с raw dict.
-8. Места, где manager/factory знает TOML или строковый operation type.
-9. Места, где используется старый TOML-формат.
-10. Несинхронные exports в `__init__.py`.
+Перенести проверки на Windows-сторону и подготовить отдельные согласованные
+задачи на оставшиеся системные проблемы.
 
 ---
 
-## Формат отчёта
+## Этап 1. Очистка кэша и базовые проверки (Windows, ручной запуск)
 
-Вернуть отчёт:
+Выполнить пользователю в PowerShell в корне проекта (`W:\VSCode\thermal_tracker`)
+с активированным `.venv`:
 
-```text
-Аудит:
-- ...
-
-Найденные проблемы:
-1. ...
-
-Группы проблем:
-- import path issues:
-- obsolete names:
-- wrong layer dependencies:
-- preset format issues:
-- tests missing:
-
-Предлагаемый порядок исправлений:
-1. ...
-2. ...
-3. ...
-
-Файлы, которые нужно менять:
-- ...
-
-Риски:
-- ...
-
-Проверки, которые предлагается запустить:
-- ...
-```
-
-После отчёта остановиться и ждать подтверждения.
-
----
-
-## Этап 2. Исправление импортов
-
-Выполнять только после подтверждения пользователя.
-
-Разрешено:
-
-- исправлять пути импортов;
-- обновлять `__init__.py`;
-- менять старые имена на уже утверждённые;
-- не менять бизнес-логику.
-
-Запрещено:
-
-- менять архитектуру;
-- менять публичный API без отдельного плана;
-- удалять файлы;
-- трогать `_OLD.py`;
-- добавлять зависимости;
-- менять TOML-формат v2;
-- менять `poetry.lock`;
-- выполнять Git-команды.
-
----
-
-## Этап 3. Минимальные тесты
-
-После стабилизации импортов добавить тесты.
-
-Минимальный набор:
-
-```text
-tests/thermal_tracker/core/preset/test_parser.py
-tests/thermal_tracker/core/preset/test_field_reader.py
-tests/thermal_tracker/core/preset/test_stage_registry.py
-tests/thermal_tracker/core/stages/config/test_stage_config_parser.py
-```
-
-Что проверить:
-
-1. `PresetFieldReader` читает int/float/bool/str/tuple.
-2. `PresetFieldReader.ensure_empty()` падает на неизвестных полях.
-3. `StageConfigParser` парсит enabled stage с operations.
-4. `StageConfigParser` падает на unknown operation type.
-5. `StageConfigParser` падает на missing operation `type`.
-6. `StageConfigParser` падает на legacy keys `methods` / `filters`.
-7. `PresetParser` парсит preset v2.
-8. `PresetParser` падает, если `stage_order` ссылается на отсутствующую stage-секцию.
-9. `PresetParser` падает, если есть stage-секция вне `stage_order`.
-10. `target_recovery` парсит stage-level поля.
-
----
-
-## Проверки
-
-Запустить только доступные инструменты проекта.
-
-Минимально:
-
-```bash
+```powershell
+Get-ChildItem -Path src, tests -Recurse -Filter __pycache__ -Force `
+    | Remove-Item -Recurse -Force
 python -m compileall src/thermal_tracker/core
-python -m pytest tests/thermal_tracker/core/preset tests/thermal_tracker/core/stages/config
+python -m pytest tests/thermal_tracker/core/preset `
+    tests/thermal_tracker/core/stages/config `
+    tests/thermal_tracker/core/stages/target_recovery -v
 ```
 
-Если `pytest` не настроен или тестов ещё нет, честно указать это в отчёте.
+Ожидаемый результат:
+
+- `compileall` отрабатывает без ошибок;
+- pytest показывает 34 пройденных теста.
+
+Если что-то падает — зафиксировать вывод и передать следующему этапу.
 
 ---
 
-## Итоговый отчёт после изменений
+## Этап 2. План на миграцию TOML-пресетов в формат v2
+
+Все файлы в `presets/*.toml` пока в старом формате. `PresetParser` их не
+разберёт. Этап выполняется отдельной задачей с прямым согласованием
+пользователя:
+
+1. Сформировать пример миграции одного пресета (`opencv_general.toml`) в формат
+   v2:
+   - `[meta]` использует `name` вместо `id`;
+   - `[pipeline]` содержит `stage_order` со списком stage name;
+   - вместо `[frame_preprocessing]` использовать
+     `[stages.input_preprocessing]` с `type = "frame_preprocessing"`;
+   - визуализацию вынести из preset.
+2. Сравнить с архитектурным примером в `llm_project_architecture.md`,
+   раздел «Формат TOML preset v2».
+3. Согласовать с пользователем перед тем, как мигрировать остальные пресеты.
+
+В рамках этого `tasks.md` миграция не выполняется.
+
+---
+
+## Этап 3. План на восстановление публичного API `core/config/`
+
+Сейчас `core/config/__init__.py` экспортирует только `RuntimeConfig`, а
+потребители (`client/*`, `server/*`, `core/scenarios/*`, `core/nnet_interface/*`,
+`core/stages/target_tracking/operations/yolo_target_tracker.py`) ещё
+импортируют:
+
+- `AVAILABLE_PRESETS`, `build_preset`, `get_preset_presentation`;
+- `TrackerPreset`, `DEFAULT_PRESET_NAME`;
+- `PROJECT_ROOT`, `load_app_config`;
+- `NeuralConfig`, `VisualizationConfig`, `ClickSelectionConfig`;
+- `PresetFieldReader` (через `core.config`).
+
+Этап выполняется отдельной задачей и требует архитектурного решения:
+
+1. Зафиксировать, какие из этих имён должны остаться публичными в новой
+   архитектуре.
+2. Перевести потребителей на новые пути (`core/preset/preset_field_reader.py`,
+   `core/stages/...`).
+3. Обновить `core/config/__init__.py` под актуальный публичный API.
+
+Без согласования API не менять.
+
+---
+
+## Этап 4. Точечные исправления, требующие отдельного подтверждения
+
+Каждое — отдельной задачей:
+
+1. **`TargetRecoveryConfig.stage` default factory.** Сейчас
+   `default_factory=lambda: StageConfig(enabled=True, operations=())` падает
+   на дефолтной конструкции. Согласовать: оставить `enabled=False`, или сделать
+   default factory возвращающим `StageConfig(enabled=False, operations=())`,
+   или потребовать явный `stage`.
+2. **`candidate_filtering` нейминг.** Config-классы используют `filter_type`,
+   а архитектура — `operation_type`. Согласовать переименование с правкой
+   импортов в `factory.py` / `manager.py` стадии.
+3. **Чистка `_OLD.py` и `__OLD.py`.** После того, как все потребители
+   `core.config` мигрированы, спланировать снос `preset_OLD.py`,
+   `preset_loader_OLD.py`, `click_target_selector__OLD.py`. Не сейчас.
+
+---
+
+## Жёсткие ограничения, продолжающие действовать
+
+- Не менять архитектуру preset v2.
+- Не менять публичный API без отдельной фиксации в отчёте.
+- Не удалять файлы.
+- Не трогать `*_OLD.py` и `*__OLD.py`.
+- Не добавлять зависимости.
+- Не менять `poetry.lock`.
+- Не выполнять Git-команды.
+- Не делать массовые переименования.
+- Не переносить визуализацию в core.
+- Не возвращать `NeuralConfig` в root Preset.
+- Не менять бизнес-логику tracking/selection/recovery без явной необходимости.
+
+---
+
+## Формат отчёта по этапу
 
 После любых изменений вернуть:
 

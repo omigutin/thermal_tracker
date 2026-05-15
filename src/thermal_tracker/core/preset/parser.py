@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from ..config.preset_OLD import TargetRecoveryConfig
-from thermal_tracker.core.stages.config.stage_config import StageConfig
-from thermal_tracker.core.stages.config.stage_config_parser import StageConfigParser
+from ..stages.config.stage_config import StageConfig
+from ..stages.config.stage_config_parser import StageConfigParser
+from ..stages.target_recovery.config import TargetRecoveryConfig
 from .preset_field_reader import PresetFieldReader
 from .preset_preset import Preset, PresetMeta, PresetPipeline, StagePreset
 from .preset_stage_registry import StageRegistry, StageRegistryItem
