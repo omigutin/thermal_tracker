@@ -5,7 +5,7 @@ from typing import ClassVar, Self
 
 import cv2
 
-from .....config.preset_field_reader import PresetFieldReader
+from thermal_tracker.core.preset.preset_field_reader import PresetFieldReader
 from .....domain.models import ProcessedFrame
 from ...type import FramePreprocessorType
 from ..base_frame_preprocessor import BaseFramePreprocessor

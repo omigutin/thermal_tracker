@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import NoReturn
 
 from .config import CandidateFilterConfig
-from .operations.area_aspect_candidate_filter import AreaAspectCandidateFilter, AreaAspectCandidateFilterConfig
+from .operations.area_aspect_candidate_filter import (
+    AreaAspectCandidateFilter,
+    AreaAspectCandidateFilterConfig,
+)
 from .operations.base_candidate_filter import BaseCandidateFilter
-from .operations.border_touch_candidate_filter import BorderTouchCandidateFilter, BorderTouchCandidateFilterConfig
-from .operations.contrast_candidate_filter import ContrastCandidateFilter, ContrastCandidateFilterConfig
-
-
-# Связь конкретного класса конфигурации с runtime-классом фильтра.
-# Источник правды для фабрики: добавление новой операции делается ровно здесь.
-_RUNTIME_CLASSES: Mapping[type[CandidateFilterConfig], type[BaseCandidateFilter]] = {
-    AreaAspectCandidateFilterConfig: AreaAspectCandidateFilter,
-    BorderTouchCandidateFilterConfig: BorderTouchCandidateFilter,
-    ContrastCandidateFilterConfig: ContrastCandidateFilter,
-}
+from .operations.border_touch_candidate_filter import (
+    BorderTouchCandidateFilter,
+    BorderTouchCandidateFilterConfig,
+)
+from .operations.contrast_candidate_filter import (
+    ContrastCandidateFilter,
+    ContrastCandidateFilterConfig,
+)
 
 
 class CandidateFilterFactory:
@@ -35,9 +35,9 @@ class CandidateFilterFactory:
         result: list[BaseCandidateFilter] = []
 
         for operation_config in operations:
-            built_filter = cls.build(operation_config)
-            if built_filter is not None:
-                result.append(built_filter)
+            runtime_filter = cls.build(operation_config)
+            if runtime_filter is not None:
+                result.append(runtime_filter)
 
         return tuple(result)
 
@@ -51,10 +51,16 @@ class CandidateFilterFactory:
     @classmethod
     def _build_runtime_operation(cls, operation_config: CandidateFilterConfig) -> BaseCandidateFilter:
         """Создать runtime-фильтр по точному типу конфигурации."""
-        runtime_class = _RUNTIME_CLASSES.get(type(operation_config))
-        if runtime_class is None:
-            cls._raise_invalid_config(operation_config)
-        return runtime_class(config=operation_config)
+        if isinstance(operation_config, AreaAspectCandidateFilterConfig):
+            return AreaAspectCandidateFilter(config=operation_config)
+
+        if isinstance(operation_config, BorderTouchCandidateFilterConfig):
+            return BorderTouchCandidateFilter(config=operation_config)
+
+        if isinstance(operation_config, ContrastCandidateFilterConfig):
+            return ContrastCandidateFilter(config=operation_config)
+
+        cls._raise_invalid_config(operation_config)
 
     @staticmethod
     def _raise_invalid_config(operation_config: object) -> NoReturn:

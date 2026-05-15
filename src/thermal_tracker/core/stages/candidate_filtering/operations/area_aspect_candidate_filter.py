@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import ClassVar, Self
 
-from ....config.preset_field_reader import PresetFieldReader
+from thermal_tracker.core.preset.preset_field_reader import PresetFieldReader
 from ....domain.models import ProcessedFrame
 from ...candidate_formation.result import CandidateFormerResult
 from ...frame_stabilization.result import FrameStabilizerResult

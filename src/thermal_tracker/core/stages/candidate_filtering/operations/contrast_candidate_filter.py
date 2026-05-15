@@ -5,7 +5,7 @@ from typing import ClassVar, Self
 
 import numpy as np
 
-from ....config.preset_field_reader import PresetFieldReader
+from thermal_tracker.core.preset.preset_field_reader import PresetFieldReader
 from ....domain.models import ProcessedFrame
 from ...candidate_formation.result import CandidateFormerResult
 from ...frame_stabilization.result import FrameStabilizerResult

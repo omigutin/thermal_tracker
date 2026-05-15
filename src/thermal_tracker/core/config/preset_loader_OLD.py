@@ -1,6 +1,6 @@
 """Экспорт загрузчика алгоритмических пресетов."""
 
-from .preset import (
+from .preset_OLD import (
     AVAILABLE_PRESETS,
     DEFAULT_PRESET_NAME,
     PresetPresentation,

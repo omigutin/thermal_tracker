@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 import tomllib
 
-from .stage_config import StageConfig
-from .stage_config_parser import StageConfigParser
+from thermal_tracker.core.stages.config.stage_config import StageConfig
+from thermal_tracker.core.stages.config.stage_config_parser import StageConfigParser
 
 if TYPE_CHECKING:
     from ..stages.candidate_filtering import CandidateFilterConfig

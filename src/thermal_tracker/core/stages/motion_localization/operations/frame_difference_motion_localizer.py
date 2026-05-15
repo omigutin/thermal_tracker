@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 from ..result import MotionLocalizerResult
-from ....config.preset_field_reader import PresetFieldReader
+from thermal_tracker.core.preset.preset_field_reader import PresetFieldReader
 from ....domain.models import ProcessedFrame
 from ..type import MotionLocalizationType
 from .base_motion_localizer import BaseMotionLocalizer, BaseMotionLocalizerConfig

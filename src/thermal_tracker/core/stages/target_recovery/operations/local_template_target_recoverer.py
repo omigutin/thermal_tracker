@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import ClassVar, Self
 
 import cv2
 import numpy as np
 
-from ....config.preset_field_reader import PresetFieldReader
+from thermal_tracker.core.preset.preset_field_reader import PresetFieldReader
 from ....domain.models import BoundingBox, ProcessedFrame
 from ...frame_stabilization import FrameStabilizerResult
 from ..result import TargetRecoveryResult
